@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <title>沉浸式翻译(极简)</title>
@@ -10,7 +11,8 @@
       --card-border: #E2E8F0;
       --text-main: #000000;
       --text-sub: #64748B;
-      --accent-color: #F4B840; /* 暖黄色 */
+      --accent-color: #F4B840;
+      /* 暖黄色 */
       --btn-primary-bg: #000000;
       --btn-primary-hover: #1E293B;
       --success-color: #4CAF50;
@@ -29,7 +31,7 @@
       width: 360px;
       background: var(--bg-main);
       color: var(--text-main);
-      padding: 16px; 
+      padding: 16px;
       font-size: 13px;
       overflow-x: hidden;
     }
@@ -125,12 +127,12 @@
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
     }
 
-    input:checked + .slider {
+    input:checked+.slider {
       background-color: var(--accent-color);
       border-color: rgba(244, 184, 64, 0.3);
     }
 
-    input:checked + .slider:before {
+    input:checked+.slider:before {
       transform: translateX(22px);
     }
 
@@ -198,7 +200,8 @@
       width: 100%;
     }
 
-    input[type="text"], input[type="password"] {
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
       padding: 8px 10px;
       background: var(--card-bg);
@@ -215,7 +218,8 @@
       padding-right: 48px !important;
     }
 
-    input[type="text"]:focus, input[type="password"]:focus {
+    input[type="text"]:focus,
+    input[type="password"]:focus {
       border-color: var(--text-main);
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
     }
@@ -258,8 +262,15 @@
     }
 
     @keyframes cardFadeIn {
-      from { opacity: 0; transform: translateY(2px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(2px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .hint {
@@ -335,8 +346,15 @@
     }
 
     @keyframes statusSlideIn {
-      from { opacity: 0; transform: scale(0.98); }
-      to { opacity: 1; transform: scale(1); }
+      from {
+        opacity: 0;
+        transform: scale(0.98);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
 
     .status-success {
@@ -371,7 +389,9 @@
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     /* 自定义快捷键提示链接 */
@@ -408,6 +428,7 @@
     }
   </style>
 </head>
+
 <body>
   <!-- 顶部 Logo & 开关 -->
   <div class="header">
@@ -711,7 +732,7 @@
     <!-- 自定义快捷键提示 -->
     <div style="margin-top: 10px; margin-bottom: 6px; text-align: center;">
       <a href="#" id="open-shortcuts-link">
-        快捷键默认 Alt+Z <span>|</span> 点击自定义快捷键
+        点击自定义快捷键
       </a>
       <div style="margin-top: 5px;">
         <a href="#" id="clear-cache-link">
@@ -723,4 +744,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>
