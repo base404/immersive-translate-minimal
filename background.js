@@ -129,6 +129,7 @@ function h16(n) {
 
 // --- Google 免费翻译 ---
 async function translateGoogle(texts, from, to) {
+  console.log(`[Antigravity Translate] Calling Google Free API (from: ${from}, to: ${to})`);
   // 并发限制（每次最多并行 5 个）以防滥用
   const limit = 5;
   const results = [];
@@ -176,6 +177,7 @@ async function getEdgeToken() {
 
 async function translateMicrosoft(texts, from, to) {
   const token = await getEdgeToken();
+  console.log(`[Antigravity Translate] Calling Microsoft Edge Free API (from: ${from}, to: ${to})`);
   
   // 语言代码转换：微软简体中文代码为 zh-Hans，繁体为 zh-Hant
   let mTo = to;
@@ -215,6 +217,7 @@ async function translateMicrosoft(texts, from, to) {
 // --- 百度官方 API 翻译 ---
 async function translateBaidu(texts, from, to, appid, key) {
   if (!appid || !key) throw new Error("百度 AppID 或 Secret 密钥未配置");
+  console.log(`[Antigravity Translate] Calling Baidu API (from: ${from}, to: ${to})`);
   
   const baiduLangMap = {
     "zh-CN": "zh",
@@ -308,9 +311,12 @@ async function translateBaidu(texts, from, to, appid, key) {
 }
 
 // --- DeepSeek API 翻译 ---
-async function translateDeepSeek(texts, from, to, apiKey, apiHost) {
+async function translateDeepSeek(texts, from, to, apiKey, apiHost, apiModel) {
   if (!apiKey) throw new Error("DeepSeek API Key 未设置");
   const host = (apiHost || "https://api.deepseek.com").replace(/\/$/, "");
+  const model = apiModel || "deepseek-chat";
+  
+  console.log(`[Antigravity Translate] Calling DeepSeek API (${model}) for target language: ${to}`);
   
   const langMap = {
     "zh-CN": "Simplified Chinese",
@@ -343,7 +349,7 @@ ${JSON.stringify(texts)}`;
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: model,
       messages: [
         { role: "user", content: prompt }
       ],
@@ -375,9 +381,12 @@ ${JSON.stringify(texts)}`;
 }
 
 // --- Gemini API 翻译 ---
-async function translateGemini(texts, from, to, apiKey, apiHost) {
+async function translateGemini(texts, from, to, apiKey, apiHost, apiModel) {
   if (!apiKey) throw new Error("Gemini API Key 未设置");
   const host = (apiHost || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+  const model = apiModel || "gemini-1.5-flash";
+  
+  console.log(`[Antigravity Translate] Calling Gemini API (${model}) for target language: ${to}`);
 
   const langMap = {
     "zh-CN": "Simplified Chinese",
@@ -448,6 +457,7 @@ async function translateClaude(texts, from, to, apiKey, apiHost, apiModel) {
   if (!apiKey) throw new Error("Claude API Key 未设置");
   const host = (apiHost || "https://api.anthropic.com").replace(/\/$/, "");
   const model = apiModel || "claude-3-5-haiku-20241022";
+  console.log(`[Antigravity Translate] Calling Claude API (${model}) for target language: ${to}`);
 
   // 映射目标语言名称
   const langMap = {
