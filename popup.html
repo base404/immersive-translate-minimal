@@ -27,13 +27,12 @@
 
     body {
       width: 360px;
-      height: 412px; /* 固定高度为 412px */
       background: var(--bg-main);
       color: var(--text-main);
-      padding: 16px; /* 稍微压缩 padding 让小高度下显示更饱满 */
+      padding: 16px; 
       font-size: 13px;
       overflow-x: hidden;
-      overflow-y: auto;
+      /* 去掉了固定 412px 高度与内滚动，使高度自适应包裹内容 */
     }
 
     /* 顶部标题与开关 */
@@ -549,7 +548,7 @@
             <option value="mk">马其顿语</option>
             <option value="be">白俄罗斯语</option>
             <option value="hy">亚美尼亚语</option>
-            <option value="ka">格鲁章亚语</option>
+            <option value="ka">格鲁吉亚语</option>
             <option value="az">亚塞拜疆语</option>
             <option value="uz">乌兹别克语</option>
             <option value="kk">哈萨克语</option>
@@ -686,8 +685,8 @@
     <!-- 状态展示条 -->
     <div id="status-bar" class="status-bar"></div>
 
-    <!-- 自定义快捷键提示 -->
-    <div style="margin-top: 4px; text-align: center;">
+    <!-- 自定义快捷键提示（外层 div 新增 margin-bottom 以增加底部留白距离） -->
+    <div style="margin-top: 14px; margin-bottom: 12px; text-align: center;">
       <a href="#" id="open-shortcuts-link">
         快捷键默认 Alt+Z <span>|</span> 点击自定义快捷键
       </a>
