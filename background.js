@@ -1,5 +1,10 @@
 // Immersive Translate Core - Background Service Worker
 
+let translationCache = {};
+chrome.storage.local.get(['translationCache'], (res) => {
+  translationCache = res.translationCache || {};
+});
+
 // ==========================================
 // 1. 纯 JS MD5 算法（供百度翻译签名使用）
 // ==========================================
@@ -573,26 +578,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "translate") {
     const { texts, engine, from, to, config } = request;
     
-    let translatePromise;
+    // O(1) 预查本地缓存
+    const cachedResults = [];
+    const uncachedIndices = [];
+    const uncachedTexts = [];
     
+    texts.forEach((text, idx) => {
+      const cacheKey = `${engine}_${to}_${text}`;
+      if (translationCache[cacheKey]) {
+        cachedResults[idx] = translationCache[cacheKey];
+      } else {
+        uncachedIndices.push(idx);
+        uncachedTexts.push(text);
+      }
+    });
+
+    // 如果全部命中缓存，无须向翻译引擎发请求，直接返回
+    if (uncachedTexts.length === 0) {
+      console.log(`[Antigravity Translate] All ${texts.length} segments hit local cache (O(1)). 0 API requests consumed.`);
+      sendResponse({ success: true, translatedTexts: cachedResults });
+      return true;
+    }
+
+    // 打印部分命中缓存情况，透明显现节省了多少 API 额度
+    if (cachedResults.filter(Boolean).length > 0) {
+      console.log(`[Antigravity Translate] Cache hit: ${cachedResults.filter(Boolean).length}/${texts.length} segments retrieved from local cache. Consuming API for remaining ${uncachedTexts.length} segments.`);
+    }
+
+    let translatePromise;
     switch (engine) {
       case "google":
-        translatePromise = translateGoogle(texts, from, to);
+        translatePromise = translateGoogle(uncachedTexts, from, to);
         break;
       case "microsoft":
-        translatePromise = translateMicrosoft(texts, from, to);
+        translatePromise = translateMicrosoft(uncachedTexts, from, to);
         break;
       case "baidu":
-        translatePromise = translateBaidu(texts, from, to, config.baiduAppId, config.baiduKey);
+        translatePromise = translateBaidu(uncachedTexts, from, to, config.baiduAppId, config.baiduKey);
         break;
       case "deepseek":
-        translatePromise = translateDeepSeek(texts, from, to, config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
+        translatePromise = translateDeepSeek(uncachedTexts, from, to, config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
         break;
       case "gemini":
-        translatePromise = translateGemini(texts, from, to, config.geminiApiKey, config.geminiHost, config.geminiModel);
+        translatePromise = translateGemini(uncachedTexts, from, to, config.geminiApiKey, config.geminiHost, config.geminiModel);
         break;
       case "claude":
-        translatePromise = translateClaude(texts, from, to, config.claudeApiKey, config.claudeHost, config.claudeModel);
+        translatePromise = translateClaude(uncachedTexts, from, to, config.claudeApiKey, config.claudeHost, config.claudeModel);
         break;
       default:
         translatePromise = Promise.reject(new Error("不支持的翻译引擎: " + engine));
@@ -600,7 +631,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     translatePromise
       .then(translatedTexts => {
-        sendResponse({ success: true, translatedTexts });
+        // 校验返回行数是否匹配
+        if (translatedTexts.length !== uncachedTexts.length) {
+          throw new Error("翻译服务返回结果数量与请求数量不符");
+        }
+
+        // 回填未缓存的译文，并写入本地缓存
+        translatedTexts.forEach((translated, subIdx) => {
+          const originalIdx = uncachedIndices[subIdx];
+          const originalText = uncachedTexts[subIdx];
+          cachedResults[originalIdx] = translated;
+
+          const cacheKey = `${engine}_${to}_${originalText}`;
+          translationCache[cacheKey] = translated;
+        });
+
+        // 缓存上限控制（例如 4000 条），超出时淘汰一部分以防 local storage 溢出
+        const keys = Object.keys(translationCache);
+        if (keys.length > 4000) {
+          for (let j = 0; j < 1500; j++) {
+            delete translationCache[keys[j]];
+          }
+        }
+
+        // 异步存回 storage
+        chrome.storage.local.set({ translationCache });
+
+        sendResponse({ success: true, translatedTexts: cachedResults });
       })
       .catch(error => {
         console.error("Background translate error:", error);
@@ -665,6 +722,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateMenu") {
     updateContextMenuTitle();
     sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "clearCache") {
+    translationCache = {};
+    chrome.storage.local.remove(['translationCache'], () => {
+      console.log("[Antigravity Translate] Translation cache cleared successfully.");
+      sendResponse({ success: true });
+    });
     return true;
   }
 });

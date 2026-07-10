@@ -2,6 +2,7 @@
 
 let isTranslatingEnabled = false;
 let config = {};
+let intersectionObserver = null;
 let translationEngine = "google";
 let globalSourceLang = "auto";
 let globalTargetLang = "zh-CN";
@@ -176,6 +177,74 @@ function getCleanText(node) {
 // 3. 翻译队列管理与后台交互
 // ==========================================
 
+// 延迟实例化 IntersectionObserver 观测器
+function getIntersectionObserver() {
+  if (!intersectionObserver) {
+    intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const node = entry.target;
+          intersectionObserver.unobserve(node);
+          queueNodeForTranslation(node);
+        }
+      });
+    }, {
+      rootMargin: "0px 0px 250px 0px" // 提前 250px 挂载加载以获得平滑滚动
+    });
+  }
+  return intersectionObserver;
+}
+
+// 寻找或原地生成对照容器
+function getOrCreateTransNode(node) {
+  const blockTags = ['P', 'DIV', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SECTION', 'ARTICLE'];
+  const isBlock = blockTags.includes(node.tagName);
+  const className = isBlock ? 'immersive-translate-translation-block' : 'immersive-translate-translation';
+  
+  let transNode = node.querySelector(`.${className}`);
+  if (!transNode) {
+    transNode = document.createElement(isBlock ? 'div' : 'span');
+    transNode.className = className;
+    node.appendChild(transNode);
+  }
+  return transNode;
+}
+
+// 初始化状态并投入懒加载观测
+function initiateNodeState(node) {
+  if (node.hasAttribute('data-immersive-translate-queued') || 
+      node.hasAttribute('data-immersive-translate-translated')) {
+    return;
+  }
+
+  node.setAttribute('data-immersive-translate-queued', 'true');
+  const transNode = getOrCreateTransNode(node);
+  transNode.innerHTML = `<span class="immersive-translate-loading-spinner"></span>`;
+
+  getIntersectionObserver().observe(node);
+}
+
+// 将节点转为失败并绑定重试机制
+function markNodeAsFailed(node) {
+  node.removeAttribute('data-immersive-translate-queued');
+  const transNode = getOrCreateTransNode(node);
+  transNode.innerHTML = `<span class="immersive-translate-retry-btn">翻译失败，点此重试</span>`;
+
+  const btn = transNode.querySelector('.immersive-translate-retry-btn');
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      node.setAttribute('data-immersive-translate-queued', 'true');
+      transNode.innerHTML = `<span class="immersive-translate-loading-spinner"></span>`;
+      
+      // 重新触发
+      queueNodeForTranslation(node);
+    });
+  }
+}
+
 function queueNodeForTranslation(node) {
   translationQueue.push(node);
   
@@ -207,7 +276,7 @@ async function flushQueue() {
   }, (response) => {
     if (chrome.runtime.lastError) {
       console.error("Translation message sending error:", chrome.runtime.lastError);
-      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+      currentBatch.forEach(node => markNodeAsFailed(node));
       return;
     }
     
@@ -221,11 +290,15 @@ async function flushQueue() {
         
         if (translatedText && translatedText.trim() !== originalText.trim()) {
           injectTranslation(node, translatedText);
+        } else {
+          // 若无需翻译则移除空占位 Loading
+          const transNode = getOrCreateTransNode(node);
+          transNode.remove();
         }
       });
     } else {
       console.error("Translation logic execution error:", response ? response.error : "Unknown background error");
-      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+      currentBatch.forEach(node => markNodeAsFailed(node));
     }
   });
 }
@@ -235,14 +308,8 @@ async function flushQueue() {
 // ==========================================
 
 function injectTranslation(node, translatedText) {
-  const blockTags = ['P', 'DIV', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SECTION', 'ARTICLE'];
-  const isBlock = blockTags.includes(node.tagName);
-  
-  const span = document.createElement('span');
-  span.className = isBlock ? 'immersive-translate-translation-block' : 'immersive-translate-translation';
-  span.textContent = translatedText;
-  
-  node.appendChild(span);
+  const transNode = getOrCreateTransNode(node);
+  transNode.textContent = translatedText;
 }
 
 // ==========================================
@@ -290,7 +357,7 @@ function triggerScan() {
   scanTimer = setTimeout(() => {
     if (!isTranslatingEnabled) return;
     const nodes = getTranslateNodes(document.body);
-    nodes.forEach(node => queueNodeForTranslation(node));
+    nodes.forEach(node => initiateNodeState(node));
   }, 250);
 }
 
@@ -301,7 +368,7 @@ function triggerScan() {
 function startTranslation() {
   isTranslatingEnabled = true;
   const nodes = getTranslateNodes(document.body);
-  nodes.forEach(node => queueNodeForTranslation(node));
+  nodes.forEach(node => initiateNodeState(node));
   startObserver();
 }
 
@@ -310,6 +377,10 @@ function stopTranslation() {
   if (observer) {
     observer.disconnect();
     observer = null;
+  }
+  if (intersectionObserver) {
+    intersectionObserver.disconnect();
+    intersectionObserver = null;
   }
   
   translationQueue = [];

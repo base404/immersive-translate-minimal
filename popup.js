@@ -319,6 +319,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ==========================================
+  // 9. 一键清空翻译本地缓存
+  // ==========================================
+  const clearCacheLink = document.getElementById('clear-cache-link');
+  if (clearCacheLink) {
+    clearCacheLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      showStatus('正在清空缓存...', 'loading');
+      chrome.runtime.sendMessage({ action: "clearCache" }, (response) => {
+        if (response && response.success) {
+          showStatus('翻译本地缓存已成功清空！', 'success');
+          setTimeout(() => showStatus(''), 1500);
+        } else {
+          showStatus('清空缓存失败。', 'error');
+        }
+      });
+    });
+  }
+
   // 打开 Popup 时通知后台刷新右键菜单中的快捷键绑定展示
   chrome.runtime.sendMessage({ action: "updateMenu" });
 });

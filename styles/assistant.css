@@ -56,3 +56,54 @@
   50% { opacity: 0.8; }
   100% { opacity: 0.4; }
 }
+
+/* ==========================================
+   全新旋转 Loading 圈与重试按钮
+   ========================================== */
+
+/* 旋转动画 */
+@keyframes immersive-translate-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 加载小圆圈 */
+.immersive-translate-loading-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-left: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: var(--text-main, #64748B);
+  border-radius: 50%;
+  animation: immersive-translate-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+/* 块级对照里的圆圈垂直对齐优化 */
+.immersive-translate-translation-block .immersive-translate-loading-spinner {
+  margin-left: 0;
+  margin-top: 2px;
+}
+
+/* 失败重试按钮 (红色) */
+.immersive-translate-retry-btn {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 11px;
+  color: #D32F2F !important;
+  text-decoration: underline !important;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  vertical-align: middle;
+  transition: color 0.15s ease;
+}
+
+.immersive-translate-retry-btn:hover {
+  color: #B71C1C !important;
+}
+
+.immersive-translate-translation-block .immersive-translate-retry-btn {
+  margin-left: 0;
+  margin-top: 2px;
+}
