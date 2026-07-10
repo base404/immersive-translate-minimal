@@ -257,10 +257,12 @@ async function translateMicrosoft(texts, from, to) {
   });
 }
 
-// --- 百度官方 API 翻译 ---
-async function translateBaidu(texts, from, to, appid, key) {
+// 全局百度限速串行队列锁
+let baiduLock = Promise.resolve();
+
+// 内部核心带 54003 重试的百度 API 请求方法
+async function translateBaiduLocked(texts, from, to, appid, key) {
   if (!appid || !key) throw new Error("百度 AppID 或 Secret 密钥未配置");
-  console.log(`[Antigravity Translate] Calling Baidu API (from: ${from}, to: ${to})`);
   
   const baiduLangMap = {
     "zh-CN": "zh",
@@ -281,42 +283,62 @@ async function translateBaidu(texts, from, to, appid, key) {
   let bTo = baiduLangMap[to] || to;
   let bFrom = baiduLangMap[from] || from;
 
-  // 用换行符拼接批量翻译，并统一规范换行符为 \r\n 防止 URLSearchParams 序列化差异导致签名失效
-  const q = texts.join("\n").replace(/\r?\n/g, "\r\n");
-  const salt = Date.now().toString();
-  const sign = md5(appid + q + salt + key);
   const url = "https://fanyi-api.baidu.com/api/trans/vip/translate";
-
-  const params = new URLSearchParams({
-    q,
-    from: bFrom,
-    to: bTo,
-    appid,
-    salt,
-    sign
-  });
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: params.toString()
-  });
-
-  if (!res.ok) throw new Error(`百度 API 返回状态码 ${res.status}`);
-  const data = await res.json();
-
-  if (data.error_code) {
-    throw new Error(`百度翻译接口错误: ${data.error_msg} (错误码: ${data.error_code})`);
+  
+  // 执行带有 54003 限速超限重试的请求方法
+  async function performRequest(queryTexts) {
+    const q = queryTexts.join("\n").replace(/\r?\n/g, "\r\n");
+    let retries = 3;
+    let delay = 1500;
+    
+    while (retries > 0) {
+      const salt = Date.now().toString();
+      const sign = md5(appid + q + salt + key);
+      const params = new URLSearchParams({
+        q,
+        from: bFrom,
+        to: bTo,
+        appid,
+        salt,
+        sign
+      });
+      
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+      });
+      
+      if (!res.ok) {
+        throw new Error(`百度 API HTTP 错误 ${res.status}`);
+      }
+      
+      const data = await res.json();
+      if (data.error_code) {
+        const errCode = parseInt(data.error_code, 10);
+        if (errCode === 54003) {
+          console.warn(`[Antigravity Translate] Baidu API 54003 Rate Limited. Retrying in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+          retries--;
+          delay += 1000;
+          continue;
+        }
+        throw new Error(`百度翻译接口错误: ${data.error_msg} (错误码: ${data.error_code})`);
+      }
+      
+      return data;
+    }
+    throw new Error("百度翻译接口 54003 频限重试次数耗尽");
   }
 
+  // 1. 发起批量翻译
+  const data = await performRequest(texts);
+  
   if (data.trans_result) {
-    // 检查返回行数是否一致
     if (data.trans_result.length === texts.length) {
       return data.trans_result.map(item => item.dst);
     } else {
-      // 若因排版合并造成行数不一致，则回退到串行请求（注意百度免费 QPS=1）
+      // 2. 行数不匹配回退到逐句串行请求
       console.warn("Baidu translation count mismatch, using sequential fallback...");
       const fallbackResults = [];
       for (const text of texts) {
@@ -324,24 +346,10 @@ async function translateBaidu(texts, from, to, appid, key) {
           fallbackResults.push("");
           continue;
         }
-        await new Promise(r => setTimeout(r, 1100)); // 延迟 1.1s 避免 54003 QPS 错误
-        const singleSalt = Date.now().toString();
-        const singleSign = md5(appid + text + singleSalt + key);
-        const singleParams = new URLSearchParams({
-          q: text,
-          from: bFrom,
-          to: bTo,
-          appid,
-          salt: singleSalt,
-          sign: singleSign
-        });
-        const singleRes = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: singleParams.toString()
-        });
-        const singleData = await singleRes.json();
-        if (singleData.trans_result) {
+        // 逐句请求本身也要受到 54003 的校验和排队保护，所以用 performRequest 包裹，并等待冷却
+        await new Promise(r => setTimeout(r, 1100));
+        const singleData = await performRequest([text]);
+        if (singleData.trans_result && singleData.trans_result[0]) {
           fallbackResults.push(singleData.trans_result[0].dst);
         } else {
           fallbackResults.push(text);
@@ -351,6 +359,24 @@ async function translateBaidu(texts, from, to, appid, key) {
     }
   }
   throw new Error("百度未返回有效翻译结果");
+}
+
+// --- 百度官方 API 翻译 ---
+async function translateBaidu(texts, from, to, appid, key) {
+  const result = await new Promise((resolve, reject) => {
+    baiduLock = baiduLock.then(async () => {
+      try {
+        console.log(`[Antigravity Translate] Baidu Request Queue Running (texts: ${texts.length})`);
+        const res = await translateBaiduLocked(texts, from, to, appid, key);
+        resolve(res);
+      } catch (err) {
+        reject(err);
+      }
+      // 每次百度 API 任务执行完，强制空闲等待 1100 毫秒
+      await new Promise(r => setTimeout(r, 1100));
+    });
+  });
+  return result;
 }
 
 // --- DeepSeek API 翻译 ---
