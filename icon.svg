@@ -1,10 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#c084fc;stop-opacity:1" />
+    <!-- 背景渐变：深邃黑到暗 Slate -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    <!-- 黄金渐变：代表翻译流和尊贵质感 -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fef08a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#facc15;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#eab308;stop-opacity:1" />
+    </linearGradient>
+    <!-- 浅层高光 -->
+    <linearGradient id="lightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.15" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#grad)" />
-  <text x="50%" y="62%" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">T</text>
+  
+  <!-- 底座圆角矩形 -->
+  <rect width="128" height="128" rx="30" fill="url(#bgGrad)" />
+  <rect width="128" height="128" rx="30" fill="url(#lightGrad)" />
+  <!-- 外边框黄金细线 -->
+  <rect x="1.5" y="1.5" width="125" height="125" rx="28.5" fill="none" stroke="url(#goldGrad)" stroke-width="1.5" stroke-opacity="0.25" />
+
+  <!-- 莫比乌斯翻译环（左） -->
+  <path d="M42 40 C 25 40, 25 88, 42 88 C 55 88, 73 58, 86 40" fill="none" stroke="url(#goldGrad)" stroke-width="6" stroke-linecap="round" opacity="0.3" />
+  <!-- 莫比乌斯翻译环（右） -->
+  <path d="M86 40 C 103 40, 103 88, 86 88 C 73 88, 55 58, 42 40" fill="none" stroke="url(#goldGrad)" stroke-width="6" stroke-linecap="round" opacity="0.3" stroke-dasharray="1 10" />
+
+  <!-- 中间的科技感“T”字母造型 -->
+  <!-- 横梁部分 -->
+  <path d="M34 46 L94 46" stroke="url(#goldGrad)" stroke-width="10" stroke-linecap="round" />
+  <!-- 竖梁部分 -->
+  <path d="M64 46 L64 88" stroke="url(#goldGrad)" stroke-width="10" stroke-linecap="round" />
+  <!-- 黄金中心发光圆点，增添灵动气息 -->
+  <circle cx="64" cy="88" r="5" fill="#fef08a" />
 </svg>
