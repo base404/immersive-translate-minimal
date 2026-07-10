@@ -118,6 +118,7 @@ function matchSourceLanguage(text) {
 
 function getTranslateNodes(root) {
   const nodes = [];
+  const visitedParents = new Set();
   
   function walk(node) {
     if (!node) return;
@@ -148,8 +149,9 @@ function getTranslateNodes(root) {
       // 动态校验源语言并匹配合适的父元素
       if (parent && TARGET_TAGS.has(parent.tagName) && matchSourceLanguage(text)) {
         if (!parent.hasAttribute('data-immersive-translate-translated') && 
-            !parent.hasAttribute('data-immersive-translate-queued')) {
-          parent.setAttribute('data-immersive-translate-queued', 'true');
+            !parent.hasAttribute('data-immersive-translate-queued') &&
+            !visitedParents.has(parent)) {
+          visitedParents.add(parent);
           nodes.push(parent);
         }
       }
