@@ -30,7 +30,12 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Immersive Translate Core"
+    "default_title": "Immersive Translate Core",
+    "default_icon": {
+      "16": "icon-16.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
   },
   "commands": {
     "toggle-translate": {
@@ -41,6 +46,8 @@
     }
   },
   "icons": {
-    "128": "icon.svg"
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
   }
 }
