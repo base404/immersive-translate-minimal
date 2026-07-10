@@ -213,7 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({
       action: "testConnection",
       engine: engine,
-      config: currentConfig
+      config: currentConfig,
+      sourceLang: sourceLangSelect.value,
+      targetLang: targetLangSelect.value
     }, (response) => {
       if (chrome.runtime.lastError) {
         showStatus(`通信错误: ${chrome.runtime.lastError.message}`, 'error');

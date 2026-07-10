@@ -560,28 +560,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "testConnection") {
-    const { engine, config } = request;
-    const testText = ["Hello, this is a test of translation capability."];
+    const { engine, config, sourceLang, targetLang } = request;
+    const from = sourceLang || "auto";
+    const to = targetLang || "zh-CN";
+    const testText = (to === "en") ? ["测试"] : ["Hello"];
     
     let translatePromise;
     switch (engine) {
       case "google":
-        translatePromise = translateGoogle(testText, "auto", "zh-CN");
+        translatePromise = translateGoogle(testText, from, to);
         break;
       case "microsoft":
-        translatePromise = translateMicrosoft(testText, "auto", "zh-CN");
+        translatePromise = translateMicrosoft(testText, from, to);
         break;
       case "baidu":
-        translatePromise = translateBaidu(testText, "auto", "zh-CN", config.baiduAppId, config.baiduKey);
+        translatePromise = translateBaidu(testText, from, to, config.baiduAppId, config.baiduKey);
         break;
       case "deepseek":
-        translatePromise = translateDeepSeek(testText, "auto", "zh-CN", config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
+        translatePromise = translateDeepSeek(testText, from, to, config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
         break;
       case "gemini":
-        translatePromise = translateGemini(testText, "auto", "zh-CN", config.geminiApiKey, config.geminiHost, config.geminiModel);
+        translatePromise = translateGemini(testText, from, to, config.geminiApiKey, config.geminiHost, config.geminiModel);
         break;
       case "claude":
-        translatePromise = translateClaude(testText, "auto", "zh-CN", config.claudeApiKey, config.claudeHost, config.claudeModel);
+        translatePromise = translateClaude(testText, from, to, config.claudeApiKey, config.claudeHost, config.claudeModel);
         break;
       default:
         translatePromise = Promise.reject(new Error("未知的测试引擎: " + engine));
