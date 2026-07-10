@@ -178,7 +178,6 @@ function getCleanText(node) {
 
 let globalQueue = []; // 全局待翻译节点队列
 let isProcessingQueue = false; // 串行队列处理锁
-let queueTimer = null;
 
 function queueNodeForTranslation(node) {
   if (node.hasAttribute('data-immersive-translate-queued')) return;
