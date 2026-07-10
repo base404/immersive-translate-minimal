@@ -402,7 +402,8 @@ async function translateGemini(texts, from, to, apiKey, apiHost) {
 Input array:
 ${JSON.stringify(texts)}`;
 
-  const url = `${host}/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const model = apiModel || "gemini-1.5-flash";
+  const url = `${host}/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
   const res = await fetch(url, {
     method: "POST",
@@ -534,10 +535,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         translatePromise = translateBaidu(texts, from, to, config.baiduAppId, config.baiduKey);
         break;
       case "deepseek":
-        translatePromise = translateDeepSeek(texts, from, to, config.deepseekApiKey, config.deepseekHost);
+        translatePromise = translateDeepSeek(texts, from, to, config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
         break;
       case "gemini":
-        translatePromise = translateGemini(texts, from, to, config.geminiApiKey, config.geminiHost);
+        translatePromise = translateGemini(texts, from, to, config.geminiApiKey, config.geminiHost, config.geminiModel);
         break;
       case "claude":
         translatePromise = translateClaude(texts, from, to, config.claudeApiKey, config.claudeHost, config.claudeModel);
@@ -574,10 +575,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         translatePromise = translateBaidu(testText, "auto", "zh-CN", config.baiduAppId, config.baiduKey);
         break;
       case "deepseek":
-        translatePromise = translateDeepSeek(testText, "auto", "zh-CN", config.deepseekApiKey, config.deepseekHost);
+        translatePromise = translateDeepSeek(testText, "auto", "zh-CN", config.deepseekApiKey, config.deepseekHost, config.deepseekModel);
         break;
       case "gemini":
-        translatePromise = translateGemini(testText, "auto", "zh-CN", config.geminiApiKey, config.geminiHost);
+        translatePromise = translateGemini(testText, "auto", "zh-CN", config.geminiApiKey, config.geminiHost, config.geminiModel);
         break;
       case "claude":
         translatePromise = translateClaude(testText, "auto", "zh-CN", config.claudeApiKey, config.claudeHost, config.claudeModel);
@@ -620,20 +621,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // ==========================================
 
 const langNames = {
-  "zh-CN": "简体中文",
-  "zh-TW": "繁体中文",
-  "en": "英语",
-  "ja": "日语",
-  "ko": "韩语",
-  "fr": "法语",
-  "es": "西班牙语",
-  "de": "德语",
-  "ru": "俄语",
-  "it": "意大利语",
-  "pt": "葡萄牙语",
-  "vi": "越南语",
-  "th": "泰语",
-  "ar": "阿拉伯语"
+  "zh-CN": "简体中文", "zh-TW": "繁体中文", "en": "英语", "ja": "日语", "ko": "韩语",
+  "fr": "法语", "es": "西班牙语", "de": "德语", "ru": "俄语", "it": "意大利语", "pt": "葡萄牙语",
+  "vi": "越南语", "th": "泰语", "ar": "阿拉伯语", "id": "印尼语", "tr": "土耳其语", "nl": "荷兰语",
+  "pl": "波兰语", "sv": "瑞典语", "da": "丹麦语", "fi": "芬兰语", "no": "挪威语", "cs": "捷克语",
+  "hu": "匈牙利语", "ro": "罗马尼亚语", "el": "希腊语", "he": "希伯来语", "hi": "印地语", "uk": "乌克兰语",
+  "ms": "马来语", "sk": "斯洛伐克语", "bg": "保加利亚语", "hr": "克罗地亚语", "lt": "立宛陶语", "lv": "拉脱维亚语",
+  "et": "爱沙尼亚语", "sl": "斯洛文尼亚语", "fa": "波斯语", "bn": "孟加拉语", "tl": "菲律宾语", "sr": "塞尔维亚语",
+  "ca": "加泰罗尼亚语", "ga": "爱尔兰语", "gl": "加利西亚语", "eu": "巴斯克语", "is": "冰岛语", "sq": "阿尔巴尼亚语",
+  "mk": "马其顿语", "be": "白俄罗斯语", "hy": "亚美尼亚语", "ka": "格鲁吉亚语", "az": "阿塞拜疆语",
+  "uz": "乌兹别克语", "kk": "哈萨克语", "ky": "吉尔吉斯语", "tg": "塔吉克语", "tk": "土库曼语", "mn": "蒙古语",
+  "ne": "尼泊尔语", "si": "僧伽罗语", "ta": "泰米尔语", "te": "泰卢固语", "kn": "卡纳达语", "ml": "马拉雅拉姆语",
+  "my": "缅甸语", "km": "高棉语", "lo": "老挝语", "mi": "毛利语", "zu": "祖鲁语", "xh": "科萨语",
+  "af": "南非荷兰语", "sw": "斯瓦希里语", "cy": "威尔士语", "eo": "世界语"
 };
 
 function updateContextMenuTitle() {
@@ -706,26 +706,23 @@ chrome.commands.onCommand.addListener((command) => {
       if (tabs && tabs[0] && tabs[0].id) {
         const tabId = tabs[0].id;
         
-        chrome.storage.local.get(['isEnabled', 'engine', 'config', 'sourceLang', 'targetLang'], (res) => {
-          const nextEnabled = !res.isEnabled;
+        chrome.storage.local.get(['engine', 'config', 'sourceLang', 'targetLang'], (res) => {
           const engine = res.engine || 'google';
           const config = res.config || {};
           const sourceLang = res.sourceLang || 'auto';
           const targetLang = res.targetLang || 'zh-CN';
 
-          chrome.storage.local.set({ isEnabled: nextEnabled }, () => {
-            chrome.tabs.sendMessage(tabId, {
-              action: "toggleTranslation",
-              isEnabled: nextEnabled,
-              engine: engine,
-              currentConfig: config,
-              sourceLang: sourceLang,
-              targetLang: targetLang
-            }, () => {
-              if (chrome.runtime.lastError) {
-                console.log("Shortcut toggle message delivery failed.");
-              }
-            });
+          // 直接向 content 发送 shortcutToggle 消息，不在本地修改全局 isEnabled 标志
+          chrome.tabs.sendMessage(tabId, {
+            action: "shortcutToggle",
+            engine: engine,
+            currentConfig: config,
+            sourceLang: sourceLang,
+            targetLang: targetLang
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.log("Shortcut toggle message delivery failed.");
+            }
           });
         });
       }

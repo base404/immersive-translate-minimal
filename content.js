@@ -61,29 +61,44 @@ function matchSourceLanguage(text) {
     return /[\u3040-\u309F\u30A0-\u30FF]/.test(clean);
   } else if (globalSourceLang === 'ko') {
     return /[\uAC00-\uD7AF]/.test(clean);
-  } else if (globalSourceLang === 'fr' || globalSourceLang === 'es' || globalSourceLang === 'de' || globalSourceLang === 'it' || globalSourceLang === 'pt' || globalSourceLang === 'vi') {
-    // 基础和扩展拉丁字符（法语、德语、西班牙语、意大利语、葡萄牙语和越南语）
+  } else if (globalSourceLang === 'fr' || globalSourceLang === 'es' || globalSourceLang === 'de' || globalSourceLang === 'it' || globalSourceLang === 'pt' || globalSourceLang === 'vi' || globalSourceLang === 'id' || globalSourceLang === 'tr' || globalSourceLang === 'nl' || globalSourceLang === 'pl' || globalSourceLang === 'sv' || globalSourceLang === 'da' || globalSourceLang === 'fi' || globalSourceLang === 'no' || globalSourceLang === 'cs' || globalSourceLang === 'hu' || globalSourceLang === 'ro' || globalSourceLang === 'ca' || globalSourceLang === 'gl' || globalSourceLang === 'eu' || globalSourceLang === 'is' || globalSourceLang === 'sq' || globalSourceLang === 'af' || globalSourceLang === 'sw' || globalSourceLang === 'cy') {
+    // 基础和扩展拉丁字符（法语、德语、西班牙语、意大利语、葡萄牙语、越南语、印尼语、土耳其语、荷兰语、波兰语、瑞典语、丹麦语、芬兰语、挪威语、捷克语、匈牙利语、罗马尼亚语、加泰罗尼亚语、爱尔兰语、加利西亚语、巴斯克语、冰岛语、阿尔巴尼亚语、南非荷兰语、斯瓦希里语、威尔士语）
     return /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) && !isChineseText(clean);
-  } else if (globalSourceLang === 'ru') {
-    // 西里尔字母（俄语）
+  } else if (globalSourceLang === 'ru' || globalSourceLang === 'uk' || globalSourceLang === 'bg' || globalSourceLang === 'sr' || globalSourceLang === 'be' || globalSourceLang === 'mk') {
+    // 西里尔字母语系（俄语、乌克兰语、保加利亚语、塞尔维亚语、白俄罗斯语、马其顿语）
     return /[\u0400-\u04FF]{2,}/.test(clean);
   } else if (globalSourceLang === 'th') {
     // 泰文字符
     return /[\u0E00-\u0E7F]/.test(clean);
-  } else if (globalSourceLang === 'ar') {
-    // 阿拉伯字符
+  } else if (globalSourceLang === 'ar' || globalSourceLang === 'fa') {
+    // 阿拉伯/波斯字符
     return /[\u0600-\u06FF]/.test(clean);
+  } else if (globalSourceLang === 'el') {
+    // 希腊字符
+    return /[\u0370-\u03FF]/.test(clean);
+  } else if (globalSourceLang === 'he') {
+    // 希伯来字符
+    return /[\u0590-\u05FF]/.test(clean);
+  } else if (globalSourceLang === 'hi' || globalSourceLang === 'ne') {
+    // 印地语/尼泊尔语（天城文）
+    return /[\u0900-\u097F]/.test(clean);
   } else if (globalSourceLang === 'zh-CN' || globalSourceLang === 'zh-TW') {
     return /[\u4e00-\u9fa5]/.test(clean);
   } else {
-    // 自动检测 (auto)：当目标是中文时，检测是否包含任一外文字符且并非已经是中文
+    // 自动检测 (auto)：当目标是中文时，检测是否包含任一主要外文且并非已经是中文
     if (isTargetChinese) {
       return (/[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) || 
               /[\u3040-\u309F\u30A0-\u30FF]/.test(clean) || 
               /[\uAC00-\uD7AF]/.test(clean) || 
               /[\u0400-\u04FF]/.test(clean) || 
               /[\u0E00-\u0E7F]/.test(clean) || 
-              /[\u0600-\u06FF]/.test(clean)) && !isChineseText(clean);
+              /[\u0600-\u06FF]/.test(clean) ||
+              /[\u0370-\u03FF]/.test(clean) ||
+              /[\u0590-\u05FF]/.test(clean) ||
+              /[\u0900-\u0DFF]/.test(clean) ||
+              /[\u1000-\u109F]/.test(clean) ||
+              /[\u1780-\u17FF]/.test(clean) ||
+              /[\u0E80-\u0EFF]/.test(clean)) && !isChineseText(clean);
     }
     return true;
   }
@@ -335,6 +350,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       startTranslation();
     } else {
       stopTranslation();
+    }
+    sendResponse({ success: true });
+  }
+
+  if (request.action === "shortcutToggle") {
+    const { engine, currentConfig, sourceLang, targetLang } = request;
+    translationEngine = engine || 'google';
+    config = currentConfig || {};
+    globalSourceLang = sourceLang || 'auto';
+    globalTargetLang = targetLang || 'zh-CN';
+
+    if (isTranslatingEnabled) {
+      stopTranslation();
+    } else {
+      startTranslation();
     }
     sendResponse({ success: true });
   }

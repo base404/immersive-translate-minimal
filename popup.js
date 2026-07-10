@@ -14,10 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const deepseekConfig = document.getElementById('deepseek-config');
   const deepseekKey = document.getElementById('deepseek-key');
   const deepseekHost = document.getElementById('deepseek-host');
+  const deepseekModel = document.getElementById('deepseek-model');
   
   const geminiConfig = document.getElementById('gemini-config');
   const geminiKey = document.getElementById('gemini-key');
   const geminiHost = document.getElementById('gemini-host');
+  const geminiModel = document.getElementById('gemini-model');
 
   const claudeConfig = document.getElementById('claude-config');
   const claudeKey = document.getElementById('claude-key');
@@ -44,13 +46,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // DeepSeek
     deepseekKey.value = config.deepseekApiKey || '';
     deepseekHost.value = config.deepseekHost || '';
+    deepseekModel.value = config.deepseekModel || 'deepseek-chat';
     // Gemini
     geminiKey.value = config.geminiApiKey || '';
     geminiHost.value = config.geminiHost || '';
+    geminiModel.value = config.geminiModel || 'gemini-1.5-flash';
     // Claude
     claudeKey.value = config.claudeApiKey || '';
     claudeHost.value = config.claudeHost || '';
-    claudeModel.value = config.claudeModel || '';
+    claudeModel.value = config.claudeModel || 'claude-3-5-haiku-20241022';
 
     // 渲染对应的面板展示
     updateConfigPanelsVisibility(engineSelect.value);
@@ -148,11 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
       baiduKey: baiduKey.value.trim(),
       deepseekApiKey: deepseekKey.value.trim(),
       deepseekHost: deepseekHost.value.trim(),
+      deepseekModel: deepseekModel.value,
       geminiApiKey: geminiKey.value.trim(),
       geminiHost: geminiHost.value.trim(),
+      geminiModel: geminiModel.value,
       claudeApiKey: claudeKey.value.trim(),
       claudeHost: claudeHost.value.trim(),
-      claudeModel: claudeModel.value.trim()
+      claudeModel: claudeModel.value
     };
   }
 
@@ -235,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 强校验拦截：若没有填写对应的 key 则不应该能保存
     if (!validateConfig(engine, currentConfig)) {
-      showStatus('保存失败，请填写必填的 API 配置后再保存。', 'error');
+      showStatus('保存失败，请填写必填 of API 配置后再保存。', 'error');
       return;
     }
 
