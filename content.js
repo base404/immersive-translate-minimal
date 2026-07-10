@@ -1,0 +1,323 @@
+// Antigravity Translate - Content Script
+
+let isTranslatingEnabled = false;
+let config = {};
+let translationEngine = "google";
+let globalSourceLang = "auto";
+let globalTargetLang = "zh-CN";
+
+// 存储翻译队列中的节点和信息
+let translationQueue = [];
+let queueTimer = null;
+const QUEUE_BATCH_SIZE = 15;
+const QUEUE_DELAY = 120; // 毫秒
+
+// 排除标签
+const EXCLUDE_TAGS = new Set([
+  'SCRIPT', 'STYLE', 'CODE', 'PRE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 
+  'SELECT', 'IFRAME', 'SVG', 'CANVAS', 'VIDEO', 'AUDIO', 'HEAD', 'TEMPLATE', 'BUTTON'
+]);
+
+// 适合进行对照翻译的目标容器标签
+const TARGET_TAGS = new Set([
+  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'SPAN', 'DIV', 'A', 'TD', 'TH', 'BLOCKQUOTE', 'SECTION', 'ARTICLE'
+]);
+
+// ==========================================
+// 1. 语言判定与过滤逻辑
+// ==========================================
+
+// 是否含有英文特征词
+function hasEnglishText(text) {
+  return /[a-zA-Z]{3,}/.test(text);
+}
+
+// 是否已经是中文
+function isChineseText(text) {
+  const chineseChars = text.match(/[\u4e00-\u9fa5]/g);
+  if (chineseChars && (chineseChars.length / text.length) > 0.4) {
+    return true;
+  }
+  return false;
+}
+
+// 核心多语言动态匹配
+function matchSourceLanguage(text) {
+  const clean = text.trim();
+  if (clean.length < 2) return false;
+
+  const toLang = globalTargetLang;
+
+  // 情形A：中译外（目标是英文、日文或韩文，需要翻译页面中的中文）
+  if (toLang === 'en' || toLang === 'ja' || toLang === 'ko') {
+    return /[\u4e00-\u9fa5]/.test(clean);
+  }
+
+  // 情形B：外译中（目标是简体或繁体中文，需要过滤掉中文本身）
+  if (globalSourceLang === 'en') {
+    return hasEnglishText(clean) && !isChineseText(clean);
+  } else if (globalSourceLang === 'ja') {
+    // 匹配日文假名
+    return /[\u3040-\u309F\u30A0-\u30FF]/.test(clean);
+  } else if (globalSourceLang === 'ko') {
+    // 匹配韩文字符
+    return /[\uAC00-\uD7AF]/.test(clean);
+  } else {
+    // 自动检测 (auto)：当目标是中文时，检测是否为拉丁文字/日文/韩文且并非已经是中文
+    if (toLang === 'zh-CN' || toLang === 'zh-TW') {
+      return (hasEnglishText(clean) || /[\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/.test(clean)) && !isChineseText(clean);
+    }
+    return true;
+  }
+}
+
+// ==========================================
+// 2. DOM 扫描与节点匹配
+// ==========================================
+
+function getTranslateNodes(root) {
+  const nodes = [];
+  
+  function walk(node) {
+    if (!node) return;
+    
+    // 元素节点检查
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (EXCLUDE_TAGS.has(node.tagName)) {
+        return;
+      }
+      
+      // 避免重复扫描我们已添加的翻译元素
+      if (node.classList.contains('immersive-translate-translation') || 
+          node.classList.contains('immersive-translate-translation-block')) {
+        return;
+      }
+      
+      // 如果该节点已翻译完成，跳过
+      if (node.hasAttribute('data-immersive-translate-translated')) {
+        return;
+      }
+    }
+    
+    // 文本节点检查
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent.trim();
+      const parent = node.parentElement;
+      
+      // 动态校验源语言并匹配合适的父元素
+      if (parent && TARGET_TAGS.has(parent.tagName) && matchSourceLanguage(text)) {
+        if (!parent.hasAttribute('data-immersive-translate-translated') && 
+            !parent.hasAttribute('data-immersive-translate-queued')) {
+          parent.setAttribute('data-immersive-translate-queued', 'true');
+          nodes.push(parent);
+        }
+      }
+      return;
+    }
+    
+    // 递归子节点
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      walk(child);
+    }
+  }
+  
+  walk(root);
+  return nodes;
+}
+
+// 清洗节点的文本内容
+function getCleanText(node) {
+  const clone = node.cloneNode(true);
+  clone.querySelectorAll('.immersive-translate-translation, .immersive-translate-translation-block').forEach(el => el.remove());
+  return clone.textContent.trim().replace(/\s+/g, ' ');
+}
+
+// ==========================================
+// 3. 翻译队列管理与后台交互
+// ==========================================
+
+function queueNodeForTranslation(node) {
+  translationQueue.push(node);
+  
+  if (translationQueue.length >= QUEUE_BATCH_SIZE) {
+    flushQueue();
+  } else {
+    if (queueTimer) clearTimeout(queueTimer);
+    queueTimer = setTimeout(flushQueue, QUEUE_DELAY);
+  }
+}
+
+async function flushQueue() {
+  if (translationQueue.length === 0) return;
+  
+  const currentBatch = [...translationQueue];
+  translationQueue = [];
+  if (queueTimer) clearTimeout(queueTimer);
+  
+  const textsToTranslate = currentBatch.map(node => getCleanText(node));
+  
+  // 调用 background 进行翻译，透传语言选择
+  chrome.runtime.sendMessage({
+    action: "translate",
+    texts: textsToTranslate,
+    engine: translationEngine,
+    from: globalSourceLang,
+    to: globalTargetLang,
+    config: config
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error("Translation message sending error:", chrome.runtime.lastError);
+      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+      return;
+    }
+    
+    if (response && response.success && response.translatedTexts) {
+      currentBatch.forEach((node, index) => {
+        node.removeAttribute('data-immersive-translate-queued');
+        node.setAttribute('data-immersive-translate-translated', 'true');
+        
+        const translatedText = response.translatedTexts[index];
+        const originalText = textsToTranslate[index];
+        
+        if (translatedText && translatedText.trim() !== originalText.trim()) {
+          injectTranslation(node, translatedText);
+        }
+      });
+    } else {
+      console.error("Translation logic execution error:", response ? response.error : "Unknown background error");
+      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+    }
+  });
+}
+
+// ==========================================
+// 4. 双语对照译文渲染
+// ==========================================
+
+function injectTranslation(node, translatedText) {
+  const blockTags = ['P', 'DIV', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SECTION', 'ARTICLE'];
+  const isBlock = blockTags.includes(node.tagName);
+  
+  const span = document.createElement('span');
+  span.className = isBlock ? 'immersive-translate-translation-block' : 'immersive-translate-translation';
+  span.textContent = translatedText;
+  
+  node.appendChild(span);
+}
+
+// ==========================================
+// 5. 动态监听 MutationObserver 增量扫描
+// ==========================================
+
+let observer = null;
+let scanTimer = null;
+
+function startObserver() {
+  if (observer) return;
+  
+  observer = new MutationObserver((mutations) => {
+    if (!isTranslatingEnabled) return;
+    
+    let needsScan = false;
+    for (const mutation of mutations) {
+      if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+        for (const addedNode of mutation.addedNodes) {
+          if (addedNode.nodeType === Node.ELEMENT_NODE) {
+            if (!addedNode.classList.contains('immersive-translate-translation') && 
+                !addedNode.classList.contains('immersive-translate-translation-block')) {
+              needsScan = true;
+              break;
+            }
+          }
+        }
+      }
+      if (needsScan) break;
+    }
+    
+    if (needsScan) {
+      triggerScan();
+    }
+  });
+  
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+function triggerScan() {
+  if (scanTimer) clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    if (!isTranslatingEnabled) return;
+    const nodes = getTranslateNodes(document.body);
+    nodes.forEach(node => queueNodeForTranslation(node));
+  }, 250);
+}
+
+// ==========================================
+// 6. 控制指令执行
+// ==========================================
+
+function startTranslation() {
+  isTranslatingEnabled = true;
+  const nodes = getTranslateNodes(document.body);
+  nodes.forEach(node => queueNodeForTranslation(node));
+  startObserver();
+}
+
+function stopTranslation() {
+  isTranslatingEnabled = false;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  
+  translationQueue = [];
+  if (queueTimer) clearTimeout(queueTimer);
+  if (scanTimer) clearTimeout(scanTimer);
+  
+  document.querySelectorAll('.immersive-translate-translation, .immersive-translate-translation-block').forEach(el => el.remove());
+  
+  document.querySelectorAll('[data-immersive-translate-translated]').forEach(el => {
+    el.removeAttribute('data-immersive-translate-translated');
+  });
+  document.querySelectorAll('[data-immersive-translate-queued]').forEach(el => {
+    el.removeAttribute('data-immersive-translate-queued');
+  });
+}
+
+// ==========================================
+// 7. 初始化与配置变动监听
+// ==========================================
+
+// 初始化读取
+chrome.storage.local.get(['isEnabled', 'engine', 'config', 'sourceLang', 'targetLang'], (result) => {
+  isTranslatingEnabled = result.isEnabled || false;
+  translationEngine = result.engine || 'google';
+  config = result.config || {};
+  globalSourceLang = result.sourceLang || 'auto';
+  globalTargetLang = result.targetLang || 'zh-CN';
+  
+  if (isTranslatingEnabled) {
+    startTranslation();
+  }
+});
+
+// 监听指令
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "toggleTranslation") {
+    const { isEnabled, engine, currentConfig, sourceLang, targetLang } = request;
+    translationEngine = engine || 'google';
+    config = currentConfig || {};
+    globalSourceLang = sourceLang || 'auto';
+    globalTargetLang = targetLang || 'zh-CN';
+    
+    if (isEnabled) {
+      stopTranslation();
+      startTranslation();
+    } else {
+      stopTranslation();
+    }
+    sendResponse({ success: true });
+  }
+});

@@ -1,0 +1,58 @@
+/* 沉浸式翻译注入样式表 */
+
+@keyframes immersive-translate-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 0.75;
+    transform: translateY(0);
+  }
+}
+
+/* 行内翻译样式 */
+.immersive-translate-translation {
+  display: inline;
+  font-size: 0.92em;
+  color: inherit;
+  opacity: 0.75;
+  border-bottom: 1px dashed rgba(128, 128, 128, 0.35);
+  margin-left: 6px;
+  margin-right: 2px;
+  animation: immersive-translate-fade-in 0.35s ease-out forwards;
+  transition: opacity 0.2s ease;
+}
+
+/* 块级翻译样式 */
+.immersive-translate-translation-block {
+  display: block;
+  font-size: 0.9em;
+  color: inherit;
+  opacity: 0.75;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  line-height: 1.45;
+  border-left: 2px solid rgba(128, 128, 128, 0.25);
+  padding-left: 6px;
+  animation: immersive-translate-fade-in 0.35s ease-out forwards;
+}
+
+/* 悬停时高亮译文，便于阅读 */
+.immersive-translate-translation:hover,
+.immersive-translate-translation-block:hover {
+  opacity: 1;
+  border-bottom-color: rgba(128, 128, 128, 0.8);
+}
+
+/* 翻译加载中状态样式 */
+.immersive-translate-loading {
+  opacity: 0.5;
+  animation: immersive-translate-blink 1.5s infinite ease-in-out;
+}
+
+@keyframes immersive-translate-blink {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}

@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "沉浸式翻译(极简)",
+  "version": "1.0.0",
+  "description": "沉浸式双语对照网页翻译核心版，支持谷歌、微软、百度免费翻译及 DeepSeek、Gemini 的 API 调用。",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://translate.googleapis.com/*",
+    "https://edge.microsoft.com/*",
+    "https://api.cognitive.microsofttranslator.com/*",
+    "https://fanyi-api.baidu.com/*",
+    "https://api.deepseek.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles/assistant.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Immersive Translate Core"
+  },
+  "commands": {
+    "toggle-translate": {
+      "suggested_key": {
+        "default": "Alt+Z"
+      },
+      "description": "快捷键开启或关闭双语对照翻译"
+    }
+  },
+  "icons": {
+    "128": "icon.svg"
+  }
+}
