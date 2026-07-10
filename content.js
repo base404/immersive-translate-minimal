@@ -228,7 +228,7 @@ function initiateNodeState(node) {
 
 // 将节点转为失败并绑定重试机制
 function markNodeAsFailed(node) {
-  node.removeAttribute('data-immersive-translate-queued');
+  node.setAttribute('data-immersive-translate-queued', 'failed');
   const transNode = getOrCreateTransNode(node);
   transNode.innerHTML = `<span class="immersive-translate-retry-btn">翻译失败，点此重试</span>`;
 

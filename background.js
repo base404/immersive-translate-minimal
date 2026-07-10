@@ -243,8 +243,8 @@ async function translateBaidu(texts, from, to, appid, key) {
   let bTo = baiduLangMap[to] || to;
   let bFrom = baiduLangMap[from] || from;
 
-  // 用换行符拼接批量翻译
-  const q = texts.join("\n");
+  // 用换行符拼接批量翻译，并统一规范换行符为 \r\n 防止 URLSearchParams 序列化差异导致签名失效
+  const q = texts.join("\n").replace(/\r?\n/g, "\r\n");
   const salt = Date.now().toString();
   const sign = md5(appid + q + salt + key);
   const url = "https://fanyi-api.baidu.com/api/trans/vip/translate";
