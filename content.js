@@ -98,7 +98,23 @@ function isAlreadyTargetLanguage(text, targetLang) {
   if (['en', 'fr', 'es', 'de', 'it', 'pt', 'vi', 'id', 'tr', 'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'hu', 'ro', 'ca', 'gl', 'eu', 'is', 'sq', 'af', 'sw', 'cy'].includes(targetLang)) {
     const hasLatin = /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]/.test(text);
     const hasOtherScripts = /[\u4e00-\u9fa5\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF\u0400-\u04FF\u0E00-\u0E7F\u0600-\u06FF\u0370-\u03FF\u0590-\u05FF]/.test(text);
-    return hasLatin && !hasOtherScripts;
+    if (hasLatin && !hasOtherScripts) {
+      // 通过常用特征停用词精准匹配，防止同属于拉丁字符的网页文本发生误杀
+      const stopwords = {
+        en: /\b(the|and|of|to|is|it|that|you|was|for|on|are|as|with)\b/i,
+        fr: /\b(le|la|les|de|et|un|une|en|que|est|dans|pour|qui|avec)\b/i,
+        es: /\b(el|la|los|las|de|y|un|una|en|que|es|por|para|con)\b/i,
+        de: /\b(der|die|das|und|ist|in|zu|den|von|mit|auf|für|nicht)\b/i,
+        it: /\b(il|la|i|gli|le|di|e|un|una|in|che|per|con|da|sono)\b/i,
+        pt: /\b(o|a|os|as|de|e|um|uma|em|que|para|com|por|são)\b/i
+      };
+      const regex = stopwords[targetLang];
+      if (regex) {
+        return regex.test(text);
+      }
+      return document.documentElement.lang.startsWith(targetLang);
+    }
+    return false;
   }
   if (['ru', 'uk', 'bg', 'sr', 'be', 'mk'].includes(targetLang)) {
     return /[\u0400-\u04FF]/.test(text);
@@ -125,7 +141,14 @@ function matchSourceLanguage(text) {
   const clean = text.trim();
   if (clean.length < 2) return false;
 
-  // 如果已经达到了目标语言，则跳过不翻译
+  // 如果指定了具体的源语言，且源语言与目标语言不同：
+  // 此时直接匹配源语言的特征，不需要再用 isAlreadyTargetLanguage 过滤（防止同为拉丁字符时被误杀）
+  if (globalSourceLang !== 'auto') {
+    if (globalSourceLang === globalTargetLang) return false;
+    return hasScript(clean, globalSourceLang);
+  }
+
+  // 自动检测模式下，如果已经是目标语言，则跳过不翻译
   if (isAlreadyTargetLanguage(clean, globalTargetLang)) {
     return false;
   }
@@ -304,6 +327,7 @@ async function flushQueue() {
   }, (response) => {
     if (chrome.runtime.lastError) {
       console.error("Translation message sending error:", chrome.runtime.lastError);
+      console.info("[Antigravity Translate Debug Guide] To inspect background network calls, open chrome://extensions/, enable 'Developer mode', and click 'service worker' under 'Inspect views' of this extension.");
       currentBatch.forEach(node => markNodeAsFailed(node));
       return;
     }
@@ -325,7 +349,9 @@ async function flushQueue() {
         }
       });
     } else {
-      console.error("Translation logic execution error:", response ? response.error : "Unknown background error");
+      const errorMsg = response ? response.error : "Unknown background error";
+      console.error(`[Antigravity Translate Error] ${errorMsg}`);
+      console.info("[Antigravity Translate Debug Guide] To debug background network calls, open chrome://extensions/, enable 'Developer mode', and click 'service worker' under 'Inspect views' of this extension.");
       currentBatch.forEach(node => markNodeAsFailed(node));
     }
   });

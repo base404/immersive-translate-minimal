@@ -7,6 +7,22 @@ chrome.storage.local.get(['translationCache'], (res) => {
 
 let tabTranslationState = {};
 
+const langNames = {
+  "zh-CN": "简体中文", "zh-TW": "繁体中文", "en": "英语", "ja": "日语", "ko": "韩语",
+  "fr": "法语", "es": "西班牙语", "de": "德语", "ru": "俄语", "it": "意大利语", "pt": "葡萄牙语",
+  "vi": "越南语", "th": "泰语", "ar": "阿拉伯语", "id": "印尼语", "tr": "土耳其语", "nl": "荷兰语",
+  "pl": "波兰语", "sv": "瑞典语", "da": "丹麦语", "fi": "芬兰语", "no": "挪威语", "cs": "捷克语",
+  "hu": "匈牙利语", "ro": "罗马尼亚语", "el": "希腊语", "he": "希伯来语", "hi": "印地语", "uk": "乌克兰语",
+  "ms": "马来语", "sk": "斯洛伐克语", "bg": "保加利亚语", "hr": "克罗地亚语", "lt": "立宛陶语", "lv": "拉脱维亚语",
+  "et": "爱沙尼亚语", "sl": "斯洛文尼亚语", "fa": "波斯语", "bn": "孟加拉语", "tl": "菲律宾语", "sr": "塞尔维亚语",
+  "ca": "加泰罗尼亚语", "ga": "爱尔兰语", "gl": "加利西亚语", "eu": "巴斯克语", "is": "冰岛语", "sq": "阿尔巴尼亚语",
+  "mk": "马其顿语", "be": "白俄罗斯语", "hy": "亚美尼亚语", "ka": "格鲁吉亚语", "az": "阿塞拜疆语",
+  "uz": "乌兹别克语", "kk": "哈萨克语", "ky": "吉尔吉斯语", "tg": "塔吉克语", "tk": "土库曼语", "mn": "蒙古语",
+  "ne": "尼泊尔语", "si": "僧伽罗语", "ta": "泰米尔语", "te": "泰卢固语", "kn": "卡纳达语", "ml": "马拉雅拉姆语",
+  "my": "缅甸语", "km": "高棉语", "lo": "老挝语", "mi": "毛利语", "zu": "祖鲁语", "xh": "科萨语",
+  "af": "南非荷兰语", "sw": "斯瓦希里语", "cy": "威尔士语", "eo": "世界语"
+};
+
 // ==========================================
 // 1. 纯 JS MD5 算法（供百度翻译签名使用）
 // ==========================================
@@ -224,14 +240,19 @@ async function translateMicrosoft(texts, from, to) {
   const token = await getEdgeToken();
   console.log(`[Antigravity Translate] Calling Microsoft Edge Free API (from: ${from}, to: ${to})`);
   
-  // 语言代码转换：微软简体中文代码为 zh-Hans，繁体为 zh-Hant
+  // 语言代码转换：微软简体中文代码为 zh-Hans，繁体为 zh-Hant，菲律宾语为 fil，塞尔维亚语为 sr-Cyrl
   let mTo = to;
   if (to === "zh" || to === "zh-CN") mTo = "zh-Hans";
-  if (to === "zh-TW") mTo = "zh-Hant";
+  else if (to === "zh-TW") mTo = "zh-Hant";
+  else if (to === "tl") mTo = "fil";
+  else if (to === "sr") mTo = "sr-Cyrl";
+
   let mFrom = from;
   if (from === "zh" || from === "zh-CN") mFrom = "zh-Hans";
-  if (from === "zh-TW") mFrom = "zh-Hant";
-  if (from === "auto") mFrom = "";
+  else if (from === "zh-TW") mFrom = "zh-Hant";
+  else if (from === "tl") mFrom = "fil";
+  else if (from === "sr") mFrom = "sr-Cyrl";
+  else if (from === "auto") mFrom = "";
 
   const url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=${mFrom}&to=${mTo}`;
   const body = texts.map(t => ({ Text: t }));
@@ -280,7 +301,15 @@ async function translateBaiduLocked(texts, from, to, appid, key) {
     "pt": "pt",
     "vi": "vie",
     "th": "th",
-    "ar": "ara"
+    "ar": "ara",
+    "eo": "epo", "zu": "zul", "he": "heb", "km": "khm", "lo": "lao", "my": "bur",
+    "da": "dan", "fi": "fin", "sv": "swe", "no": "nor", "cs": "cze", "hu": "hun",
+    "ro": "rom", "uk": "ukr", "bg": "bul", "hr": "hrv", "lt": "lit", "lv": "lav",
+    "et": "est", "sl": "slo", "bn": "ben", "fa": "per", "hy": "arm", "ka": "geo",
+    "az": "aze", "uz": "uzb", "kk": "kaz", "ky": "kir", "tg": "tgk", "tk": "tuk",
+    "mn": "mon", "si": "sin", "ta": "tam", "te": "tel", "kn": "kan", "ml": "mal",
+    "mi": "mao", "xh": "xho", "af": "afr", "sw": "swa", "cy": "wel", "is": "ice",
+    "sq": "alb", "mk": "mac", "be": "bel"
   };
   let bTo = baiduLangMap[to] || to;
   let bFrom = baiduLangMap[from] || from;
@@ -387,31 +416,15 @@ async function translateDeepSeek(texts, from, to, apiKey, apiHost, apiModel) {
   const host = (apiHost || "https://api.deepseek.com").replace(/\/$/, "");
   const model = apiModel || "deepseek-chat";
   
-  console.log(`[Antigravity Translate] Calling DeepSeek API (${model}) for target language: ${to}`);
+  const targetLangName = langNames[to] || to;
+  console.log(`[Antigravity Translate] Calling DeepSeek API (${model}) for target language: ${targetLangName}`);
   
-  const langMap = {
-    "zh-CN": "Simplified Chinese",
-    "zh-TW": "Traditional Chinese",
-    "en": "English",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "fr": "French",
-    "es": "Spanish",
-    "de": "German",
-    "ru": "Russian",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "vi": "Vietnamese",
-    "th": "Thai",
-    "ar": "Arabic"
-  };
-  const targetLangName = langMap[to] || "Simplified Chinese";
+  const prompt = `你是一个专业的翻译官。请将以下 JSON 对象中的 "translations" 数组中的每一项文本翻译为 ${targetLangName}。
+请返回一个 JSON 对象，其中包含且仅包含一个 "translations" 键，其值为对应的翻译后文本字符串数组，顺序与输入完全一致。
+请确保返回的内容是纯粹的 JSON 对象，不要包含任何 markdown 代码块标记（如 \`\`\`json）或任何额外的解释性文字。
 
-  // 构造高效率 JSON 翻译 Prompt
-  const prompt = `You are a professional translator. Translate the following text segments into ${targetLangName}. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
-
-Input array:
-${JSON.stringify(texts)}`;
+输入对象：
+${JSON.stringify({ translations: texts })}`;
 
   let retries = 3;
   let delay = 2000;
@@ -428,6 +441,7 @@ ${JSON.stringify(texts)}`;
         messages: [
           { role: "user", content: prompt }
         ],
+        response_format: { type: "json_object" },
         temperature: 0.1
       })
     });
@@ -456,8 +470,8 @@ ${JSON.stringify(texts)}`;
   try {
     const cleanContent = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(cleanContent);
-    if (Array.isArray(parsed)) {
-      return parsed;
+    if (parsed && Array.isArray(parsed.translations)) {
+      return parsed.translations;
     }
   } catch (e) {
     console.error("Failed to parse DeepSeek JSON response:", content, e);
@@ -471,30 +485,15 @@ async function translateGemini(texts, from, to, apiKey, apiHost, apiModel) {
   const host = (apiHost || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
   const model = apiModel || "gemini-3.1-flash-lite";
   
-  console.log(`[Antigravity Translate] Calling Gemini API (${model}) for target language: ${to}`);
+  const targetLangName = langNames[to] || to;
+  console.log(`[Antigravity Translate] Calling Gemini API (${model}) for target language: ${targetLangName}`);
 
-  const langMap = {
-    "zh-CN": "Simplified Chinese",
-    "zh-TW": "Traditional Chinese",
-    "en": "English",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "fr": "French",
-    "es": "Spanish",
-    "de": "German",
-    "ru": "Russian",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "vi": "Vietnamese",
-    "th": "Thai",
-    "ar": "Arabic"
-  };
-  const targetLangName = langMap[to] || "Simplified Chinese";
+  const prompt = `你是一个专业的翻译官。请将以下 JSON 对象中的 "translations" 数组中的每一项文本翻译为 ${targetLangName}。
+请返回一个 JSON 对象，其中包含且仅包含一个 "translations" 键，其值为对应的翻译后文本字符串数组，顺序与输入完全一致。
+请确保返回的内容是纯粹的 JSON 对象，不要包含任何 markdown 代码块标记（如 \`\`\`json）或任何额外的解释性文字。
 
-  const prompt = `You are a professional translator. Translate the following text segments into ${targetLangName}. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
-
-Input array:
-${JSON.stringify(texts)}`;
+输入对象：
+${JSON.stringify({ translations: texts })}`;
 
   const url = `${host}/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
@@ -541,8 +540,8 @@ ${JSON.stringify(texts)}`;
 
   try {
     const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) {
-      return parsed;
+    if (parsed && Array.isArray(parsed.translations)) {
+      return parsed.translations;
     }
   } catch (e) {
     console.error("Failed to parse Gemini JSON response:", content, e);
@@ -555,31 +554,16 @@ async function translateClaude(texts, from, to, apiKey, apiHost, apiModel) {
   if (!apiKey) throw new Error("Claude API Key 未设置");
   const host = (apiHost || "https://api.anthropic.com").replace(/\/$/, "");
   const model = apiModel || "claude-3-5-haiku-20241022";
-  console.log(`[Antigravity Translate] Calling Claude API (${model}) for target language: ${to}`);
+  
+  const targetLangName = langNames[to] || to;
+  console.log(`[Antigravity Translate] Calling Claude API (${model}) for target language: ${targetLangName}`);
 
-  // 映射目标语言名称
-  const langMap = {
-    "zh-CN": "Simplified Chinese",
-    "zh-TW": "Traditional Chinese",
-    "en": "English",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "fr": "French",
-    "es": "Spanish",
-    "de": "German",
-    "ru": "Russian",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "vi": "Vietnamese",
-    "th": "Thai",
-    "ar": "Arabic"
-  };
-  const targetLangName = langMap[to] || "Simplified Chinese";
+  const prompt = `你是一个专业的翻译官。请将以下 JSON 对象中的 "translations" 数组中的每一项文本翻译为 ${targetLangName}。
+请返回一个 JSON 对象，其中包含且仅包含一个 "translations" 键，其值为对应的翻译后文本字符串数组，顺序与输入完全一致。
+请确保返回的内容是纯粹的 JSON 对象，不要包含任何 markdown 代码块标记（如 \`\`\`json）或任何额外的解释性文字。
 
-  const prompt = `You are a professional translator. Translate the following text segments into ${targetLangName}. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
-
-Input array:
-${JSON.stringify(texts)}`;
+输入对象：
+${JSON.stringify({ translations: texts })}`;
 
   let retries = 3;
   let delay = 2000;
@@ -626,8 +610,8 @@ ${JSON.stringify(texts)}`;
   try {
     const cleanContent = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(cleanContent);
-    if (Array.isArray(parsed)) {
-      return parsed;
+    if (parsed && Array.isArray(parsed.translations)) {
+      return parsed.translations;
     }
   } catch (e) {
     console.error("Failed to parse Claude JSON response:", content, e);
@@ -660,6 +644,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const uncachedTexts = [];
     
     texts.forEach((text, idx) => {
+      if (!text.trim()) {
+        cachedResults[idx] = text;
+        return;
+      }
       const cacheKey = `${engine}_${from}_${to}_${text}`;
       if (translationCache[cacheKey]) {
         cachedResults[idx] = translationCache[cacheKey];
@@ -736,8 +724,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, translatedTexts: cachedResults });
       })
       .catch(error => {
-        console.error("Background translate error:", error);
-        sendResponse({ success: false, error: error.message });
+        console.error(`[Antigravity Translate] Background translate error for engine [${engine}] translating from [${from}] to [${to}]:`, error);
+        console.info("[Antigravity Translate Debug Guide] You can inspect extension Network requests and detailed logs by opening chrome://extensions/, enabling 'Developer mode', and clicking 'service worker' under 'Inspect views' of this extension.");
+        sendResponse({ success: false, error: `${error.message} (请在 chrome://extensions/ 页面点击 "检查视图: service worker" 查看后台网络请求报错详情)` });
       });
 
     return true; // 声明异步响应
@@ -814,22 +803,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // ==========================================
 // 4. 右键菜单与快捷键管理
 // ==========================================
-
-const langNames = {
-  "zh-CN": "简体中文", "zh-TW": "繁体中文", "en": "英语", "ja": "日语", "ko": "韩语",
-  "fr": "法语", "es": "西班牙语", "de": "德语", "ru": "俄语", "it": "意大利语", "pt": "葡萄牙语",
-  "vi": "越南语", "th": "泰语", "ar": "阿拉伯语", "id": "印尼语", "tr": "土耳其语", "nl": "荷兰语",
-  "pl": "波兰语", "sv": "瑞典语", "da": "丹麦语", "fi": "芬兰语", "no": "挪威语", "cs": "捷克语",
-  "hu": "匈牙利语", "ro": "罗马尼亚语", "el": "希腊语", "he": "希伯来语", "hi": "印地语", "uk": "乌克兰语",
-  "ms": "马来语", "sk": "斯洛伐克语", "bg": "保加利亚语", "hr": "克罗地亚语", "lt": "立宛陶语", "lv": "拉脱维亚语",
-  "et": "爱沙尼亚语", "sl": "斯洛文尼亚语", "fa": "波斯语", "bn": "孟加拉语", "tl": "菲律宾语", "sr": "塞尔维亚语",
-  "ca": "加泰罗尼亚语", "ga": "爱尔兰语", "gl": "加利西亚语", "eu": "巴斯克语", "is": "冰岛语", "sq": "阿尔巴尼亚语",
-  "mk": "马其顿语", "be": "白俄罗斯语", "hy": "亚美尼亚语", "ka": "格鲁吉亚语", "az": "阿塞拜疆语",
-  "uz": "乌兹别克语", "kk": "哈萨克语", "ky": "吉尔吉斯语", "tg": "塔吉克语", "tk": "土库曼语", "mn": "蒙古语",
-  "ne": "尼泊尔语", "si": "僧伽罗语", "ta": "泰米尔语", "te": "泰卢固语", "kn": "卡纳达语", "ml": "马拉雅拉姆语",
-  "my": "缅甸语", "km": "高棉语", "lo": "老挝语", "mi": "毛利语", "zu": "祖鲁语", "xh": "科萨语",
-  "af": "南非荷兰语", "sw": "斯瓦希里语", "cy": "威尔士语", "eo": "世界语"
-};
 
 function updateContextMenuTitle() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
