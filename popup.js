@@ -367,6 +367,103 @@ document.addEventListener('DOMContentLoaded', () => {
   // 初始化调用显示缓存大小
   updateCacheSizeDisplay();
 
+  // ==========================================
+  // 10. 配置一键导入/导出（点击极简）
+  // ==========================================
+  const btnConfigIo = document.getElementById('btn-config-io');
+  if (btnConfigIo) {
+    btnConfigIo.addEventListener('click', async () => {
+      try {
+        let clipboardText = '';
+        try {
+          clipboardText = await navigator.clipboard.readText();
+        } catch (err) {
+          showStatus('读取剪贴板失败，请检查扩展读取剪贴板权限', 'error');
+          return;
+        }
+
+        clipboardText = clipboardText.trim();
+        let configData = null;
+
+        // 校验特定格式配置
+        if (clipboardText.startsWith('{') && clipboardText.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(clipboardText);
+            if (parsed && parsed.signature === 'immersive-translate-minimal-config') {
+              configData = parsed.data;
+            }
+          } catch (e) {
+            // 解析出错，忽略它，接下来会走导出流程
+          }
+        }
+
+        if (configData) {
+          // ================= 导入流程 =================
+          chrome.storage.local.set({
+            isEnabled: configData.isEnabled,
+            engine: configData.engine,
+            sourceLang: configData.sourceLang,
+            targetLang: configData.targetLang,
+            config: configData.config
+          }, () => {
+            // 回显 UI 面板
+            toggle.checked = configData.isEnabled || false;
+            sourceLangSelect.value = configData.sourceLang || 'auto';
+            targetLangSelect.value = configData.targetLang || 'zh-CN';
+            engineSelect.value = configData.engine || 'google';
+
+            const c = configData.config || {};
+            baiduAppId.value = c.baiduAppId || '';
+            baiduKey.value = c.baiduKey || '';
+            deepseekKey.value = c.deepseekApiKey || '';
+            deepseekHost.value = c.deepseekHost || '';
+            deepseekModel.value = c.deepseekModel || 'deepseek-chat';
+            geminiKey.value = c.geminiApiKey || '';
+            geminiHost.value = c.geminiHost || '';
+            geminiModel.value = c.geminiModel || 'gemini-3.1-flash-lite';
+            claudeKey.value = c.claudeApiKey || '';
+            claudeHost.value = c.claudeHost || '';
+            claudeModel.value = c.claudeModel || 'claude-3-5-haiku-20241022';
+
+            // 重新刷新面板可见性与消除错误状态
+            updateConfigPanelsVisibility(engineSelect.value);
+            clearValidationErrors();
+
+            // 广播配置给网页
+            notifyActiveTab(configData.isEnabled, configData.engine, configData.sourceLang, configData.targetLang, configData.config, false);
+
+            showStatus('配置导入成功！', 'success');
+            setTimeout(() => showStatus(''), 1500);
+          });
+        } else {
+          // ================= 导出流程 =================
+          const currentConfig = getCurrentFormConfig();
+          const exportData = {
+            signature: 'immersive-translate-minimal-config',
+            version: '1.0.0',
+            data: {
+              isEnabled: toggle.checked,
+              engine: engineSelect.value,
+              sourceLang: sourceLangSelect.value,
+              targetLang: targetLangSelect.value,
+              config: currentConfig
+            }
+          };
+
+          try {
+            await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+            showStatus('配置导出成功！已复制到剪贴板。', 'success');
+            setTimeout(() => showStatus(''), 1500);
+          } catch (err) {
+            showStatus('复制到剪贴板失败，请重试', 'error');
+          }
+        }
+      } catch (err) {
+        showStatus('操作异常: ' + err.message, 'error');
+      }
+    });
+  }
+
   // 打开 Popup 时通知后台刷新右键菜单中的快捷键绑定展示
   chrome.runtime.sendMessage({ action: "updateMenu" });
 });

@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "contextMenus"
+    "contextMenus",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://translate.googleapis.com/*",

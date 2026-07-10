@@ -429,6 +429,17 @@
       color: #B71C1C !important;
       text-decoration: underline !important;
     }
+
+    #btn-config-io {
+      cursor: pointer;
+      text-decoration: underline dotted;
+      margin-left: 2px;
+      transition: opacity 0.15s ease;
+    }
+
+    #btn-config-io:hover {
+      opacity: 0.7;
+    }
   </style>
 </head>
 
@@ -437,7 +448,7 @@
   <div class="header">
     <div class="logo-container">
       <div class="logo-icon">T</div>
-      <div class="logo-title">沉浸式翻译(极简)</div>
+      <div class="logo-title">沉浸式翻译<span id="btn-config-io" title="点击导入/导出配置">(极简)</span></div>
     </div>
     <div class="toggle-wrapper">
       <span class="always-tip">始终自动翻译</span>
