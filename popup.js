@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 强校验拦截：若没有填写对应的 key 则不应该能保存
     if (!validateConfig(engine, currentConfig)) {
-      showStatus('保存失败，请填写必填 of API 配置后再保存。', 'error');
+      showStatus('保存失败，请填写必填的 API 配置后再保存。', 'error');
       return;
     }
 
@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
       config: currentConfig
     }, () => {
       showStatus('配置已保存并应用！', 'success');
-      notifyActiveTab(isEnabled, engine, sourceLang, targetLang, currentConfig);
+      notifyActiveTab(isEnabled, engine, sourceLang, targetLang, currentConfig, false);
       
       setTimeout(() => {
         showStatus('');
@@ -280,13 +280,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     chrome.storage.local.set({ isEnabled: isEnabled }, () => {
-      notifyActiveTab(isEnabled, engine, sourceLang, targetLang, currentConfig);
+      notifyActiveTab(isEnabled, engine, sourceLang, targetLang, currentConfig, true);
       showStatus('');
     });
   });
 
   // 广播状态消息给当前 Tab 的 Content Script
-  function notifyActiveTab(isEnabled, engine, sourceLang, targetLang, config) {
+  function notifyActiveTab(isEnabled, engine, sourceLang, targetLang, config, isExplicitToggle = false) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs && tabs[0]) {
         const activeTabId = tabs[0].id;
@@ -297,7 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
             engine: engine,
             sourceLang: sourceLang,
             targetLang: targetLang,
-            currentConfig: config
+            currentConfig: config,
+            isExplicitToggle: isExplicitToggle
           }, () => {
             if (chrome.runtime.lastError) {
               console.log("Antigravity Translate: Content script not loaded on this tab yet.");

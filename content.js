@@ -372,6 +372,7 @@ function startTranslation() {
   const nodes = getTranslateNodes(document.body);
   nodes.forEach(node => initiateNodeState(node));
   startObserver();
+  chrome.runtime.sendMessage({ action: "updateTranslationState", isTranslating: true });
 }
 
 function stopTranslation() {
@@ -387,7 +388,9 @@ function stopTranslation() {
   
   translationQueue = [];
   if (queueTimer) clearTimeout(queueTimer);
+  queueTimer = null;
   if (scanTimer) clearTimeout(scanTimer);
+  scanTimer = null;
   
   document.querySelectorAll('.immersive-translate-translation, .immersive-translate-translation-block').forEach(el => el.remove());
   
@@ -397,6 +400,7 @@ function stopTranslation() {
   document.querySelectorAll('[data-immersive-translate-queued]').forEach(el => {
     el.removeAttribute('data-immersive-translate-queued');
   });
+  chrome.runtime.sendMessage({ action: "updateTranslationState", isTranslating: false });
 }
 
 // ==========================================
@@ -419,18 +423,36 @@ chrome.storage.local.get(['isEnabled', 'engine', 'config', 'sourceLang', 'target
 // 监听指令
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "toggleTranslation") {
-    const { isEnabled, engine, currentConfig, sourceLang, targetLang, isTempTranslation } = request;
+    const { isEnabled, engine, currentConfig, sourceLang, targetLang, isTempTranslation, isExplicitToggle } = request;
+    
+    const isTargetLangChanged = targetLang && targetLang !== globalTargetLang;
+    
     translationEngine = engine || 'google';
     config = currentConfig || {};
     globalSourceLang = sourceLang || 'auto';
     globalTargetLang = targetLang || 'zh-CN';
     
-    // 只有在显式要求开启始终自动翻译，或者是由右键临时翻译触发时
-    // 且当前尚未翻译该页面，才触发 startTranslation。已翻译的网页不打扰、不清除其译文。
-    if (isEnabled || isTempTranslation) {
-      if (!isTranslatingEnabled) {
-        startTranslation();
+    if (isTargetLangChanged) {
+      if (isTranslatingEnabled) {
+        stopTranslation();
       }
+    } else {
+      if (isEnabled || isTempTranslation) {
+        if (!isTranslatingEnabled) {
+          startTranslation();
+        }
+      } else if (isExplicitToggle) {
+        if (isTranslatingEnabled) {
+          stopTranslation();
+        }
+      }
+    }
+    sendResponse({ success: true });
+  }
+
+  if (request.action === "restoreOriginal") {
+    if (isTranslatingEnabled) {
+      stopTranslation();
     }
     sendResponse({ success: true });
   }

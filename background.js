@@ -5,6 +5,8 @@ chrome.storage.local.get(['translationCache'], (res) => {
   translationCache = res.translationCache || {};
 });
 
+let tabTranslationState = {};
+
 // ==========================================
 // 1. 纯 JS MD5 算法（供百度翻译签名使用）
 // ==========================================
@@ -639,6 +641,16 @@ ${JSON.stringify(texts)}`;
 // ==========================================
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "updateTranslationState") {
+    const { isTranslating } = request;
+    if (sender.tab && sender.tab.id) {
+      tabTranslationState[sender.tab.id] = isTranslating;
+      updateContextMenuTitle();
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.action === "translate") {
     const { texts, engine, from, to, config } = request;
     
@@ -648,7 +660,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const uncachedTexts = [];
     
     texts.forEach((text, idx) => {
-      const cacheKey = `${engine}_${to}_${text}`;
+      const cacheKey = `${engine}_${from}_${to}_${text}`;
       if (translationCache[cacheKey]) {
         cachedResults[idx] = translationCache[cacheKey];
       } else {
@@ -706,7 +718,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const originalText = uncachedTexts[subIdx];
           cachedResults[originalIdx] = translated;
 
-          const cacheKey = `${engine}_${to}_${originalText}`;
+          const cacheKey = `${engine}_${from}_${to}_${originalText}`;
           translationCache[cacheKey] = translated;
         });
 
@@ -820,34 +832,47 @@ const langNames = {
 };
 
 function updateContextMenuTitle() {
-  chrome.storage.local.get(['targetLang'], (res) => {
-    const targetLang = res.targetLang || 'zh-CN';
-    const name = langNames[targetLang] || '简体中文';
-    
-    chrome.commands.getAll((commands) => {
-      const cmd = commands.find(c => c.name === "toggle-translate");
-      const shortcutText = (cmd && cmd.shortcut) ? ` (${cmd.shortcut})` : "";
-      chrome.contextMenus.update("translate-page", {
-        title: `翻译为 ${name}${shortcutText}`
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.log("Context menu update failed:", chrome.runtime.lastError.message);
-        }
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs && tabs[0];
+    const isTranslated = activeTab ? !!tabTranslationState[activeTab.id] : false;
+
+    chrome.storage.local.get(['targetLang'], (res) => {
+      const targetLang = res.targetLang || 'zh-CN';
+      const name = langNames[targetLang] || '简体中文';
+      
+      chrome.commands.getAll((commands) => {
+        const cmd = commands.find(c => c.name === "toggle-translate");
+        const shortcutText = (cmd && cmd.shortcut) ? ` (${cmd.shortcut})` : "";
+        const titleText = isTranslated ? `只显示原文${shortcutText}` : `翻译为 ${name}${shortcutText}`;
+        chrome.contextMenus.update("translate-page", {
+          title: titleText
+        }, () => {
+          if (chrome.runtime.lastError) {
+            console.log("Context menu update failed:", chrome.runtime.lastError.message);
+          }
+        });
       });
     });
   });
 }
 
-// 初始化安装时注册右键菜单，标题根据当前目标语言生成
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "translate-page",
-    title: "翻译为 简体中文",
-    contexts: ["page"]
-  }, () => {
-    updateContextMenuTitle();
+function createContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "translate-page",
+      title: "翻译为 简体中文",
+      contexts: ["page"]
+    }, () => {
+      updateContextMenuTitle();
+    });
   });
-});
+}
+
+// 初始化安装时注册右键菜单，标题根据当前目标语言生成
+chrome.runtime.onInstalled.addListener(createContextMenu);
+
+// Service Worker 重启或启动时注册右键菜单
+chrome.runtime.onStartup.addListener(createContextMenu);
 
 // 监听目标语言设置变动，实时更新右键菜单的标题
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -862,34 +887,52 @@ chrome.tabs.onActivated.addListener(() => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'loading') {
+    tabTranslationState[tabId] = false;
+  }
   if (changeInfo.status === 'complete') {
     updateContextMenuTitle();
   }
 });
 
-// 右键点击触发单页临时翻译
+chrome.tabs.onRemoved.addListener((tabId) => {
+  delete tabTranslationState[tabId];
+});
+
+// 右键点击触发单页临时翻译或恢复原文
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "translate-page" && tab && tab.id) {
-    chrome.storage.local.get(['engine', 'config', 'sourceLang', 'targetLang'], (res) => {
-      const engine = res.engine || 'google';
-      const config = res.config || {};
-      const sourceLang = res.sourceLang || 'auto';
-      const targetLang = res.targetLang || 'zh-CN';
-      
+    const isTranslated = !!tabTranslationState[tab.id];
+    if (isTranslated) {
       chrome.tabs.sendMessage(tab.id, {
-        action: "toggleTranslation",
-        isEnabled: true,
-        engine: engine,
-        currentConfig: config,
-        sourceLang: sourceLang,
-        targetLang: targetLang,
-        isTempTranslation: true
+        action: "restoreOriginal"
       }, () => {
         if (chrome.runtime.lastError) {
-          console.log("Context menu translation message delivery failed.");
+          console.log("Restore original message delivery failed.");
         }
       });
-    });
+    } else {
+      chrome.storage.local.get(['engine', 'config', 'sourceLang', 'targetLang'], (res) => {
+        const engine = res.engine || 'google';
+        const config = res.config || {};
+        const sourceLang = res.sourceLang || 'auto';
+        const targetLang = res.targetLang || 'zh-CN';
+        
+        chrome.tabs.sendMessage(tab.id, {
+          action: "toggleTranslation",
+          isEnabled: true,
+          engine: engine,
+          currentConfig: config,
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+          isTempTranslation: true
+        }, () => {
+          if (chrome.runtime.lastError) {
+            console.log("Context menu translation message delivery failed.");
+          }
+        });
+      });
+    }
   }
 });
 
