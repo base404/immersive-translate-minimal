@@ -339,17 +339,18 @@ chrome.storage.local.get(['isEnabled', 'engine', 'config', 'sourceLang', 'target
 // 监听指令
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "toggleTranslation") {
-    const { isEnabled, engine, currentConfig, sourceLang, targetLang } = request;
+    const { isEnabled, engine, currentConfig, sourceLang, targetLang, isTempTranslation } = request;
     translationEngine = engine || 'google';
     config = currentConfig || {};
     globalSourceLang = sourceLang || 'auto';
     globalTargetLang = targetLang || 'zh-CN';
     
-    if (isEnabled) {
-      stopTranslation();
-      startTranslation();
-    } else {
-      stopTranslation();
+    // 只有在显式要求开启始终自动翻译，或者是由右键临时翻译触发时
+    // 且当前尚未翻译该页面，才触发 startTranslation。已翻译的网页不打扰、不清除其译文。
+    if (isEnabled || isTempTranslation) {
+      if (!isTranslatingEnabled) {
+        startTranslation();
+      }
     }
     sendResponse({ success: true });
   }
