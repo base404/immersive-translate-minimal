@@ -177,11 +177,13 @@ async function getEdgeToken() {
 async function translateMicrosoft(texts, from, to) {
   const token = await getEdgeToken();
   
-  // 语言代码转换：微软简体中文代码为 zh-Hans
+  // 语言代码转换：微软简体中文代码为 zh-Hans，繁体为 zh-Hant
   let mTo = to;
   if (to === "zh" || to === "zh-CN") mTo = "zh-Hans";
+  if (to === "zh-TW") mTo = "zh-Hant";
   let mFrom = from;
   if (from === "zh" || from === "zh-CN") mFrom = "zh-Hans";
+  if (from === "zh-TW") mFrom = "zh-Hant";
   if (from === "auto") mFrom = "";
 
   const url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=${mFrom}&to=${mTo}`;
@@ -214,10 +216,24 @@ async function translateMicrosoft(texts, from, to) {
 async function translateBaidu(texts, from, to, appid, key) {
   if (!appid || !key) throw new Error("百度 AppID 或 Secret 密钥未配置");
   
-  let bTo = to;
-  if (to === "zh-CN") bTo = "zh";
-  let bFrom = from;
-  if (from === "zh-CN") bFrom = "zh";
+  const baiduLangMap = {
+    "zh-CN": "zh",
+    "zh-TW": "cht",
+    "en": "en",
+    "ja": "jp",
+    "ko": "kor",
+    "fr": "fra",
+    "es": "spa",
+    "ru": "ru",
+    "de": "de",
+    "it": "it",
+    "pt": "pt",
+    "vi": "vie",
+    "th": "th",
+    "ar": "ara"
+  };
+  let bTo = baiduLangMap[to] || to;
+  let bFrom = baiduLangMap[from] || from;
 
   // 用换行符拼接批量翻译
   const q = texts.join("\n");
@@ -296,8 +312,26 @@ async function translateDeepSeek(texts, from, to, apiKey, apiHost) {
   if (!apiKey) throw new Error("DeepSeek API Key 未设置");
   const host = (apiHost || "https://api.deepseek.com").replace(/\/$/, "");
   
+  const langMap = {
+    "zh-CN": "Simplified Chinese",
+    "zh-TW": "Traditional Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German",
+    "ru": "Russian",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "vi": "Vietnamese",
+    "th": "Thai",
+    "ar": "Arabic"
+  };
+  const targetLangName = langMap[to] || "Simplified Chinese";
+
   // 构造高效率 JSON 翻译 Prompt
-  const prompt = `You are a professional translator. Translate the following text segments into Simplified Chinese. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
+  const prompt = `You are a professional translator. Translate the following text segments into ${targetLangName}. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
 
 Input array:
 ${JSON.stringify(texts)}`;
@@ -345,7 +379,25 @@ async function translateGemini(texts, from, to, apiKey, apiHost) {
   if (!apiKey) throw new Error("Gemini API Key 未设置");
   const host = (apiHost || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
 
-  const prompt = `You are a professional translator. Translate the following text segments into Simplified Chinese. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
+  const langMap = {
+    "zh-CN": "Simplified Chinese",
+    "zh-TW": "Traditional Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German",
+    "ru": "Russian",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "vi": "Vietnamese",
+    "th": "Thai",
+    "ar": "Arabic"
+  };
+  const targetLangName = langMap[to] || "Simplified Chinese";
+
+  const prompt = `You are a professional translator. Translate the following text segments into ${targetLangName}. Preserve the array format exactly and return ONLY a valid JSON array of strings containing the translated texts in the same order. Do not wrap the JSON in markdown code blocks like \`\`\`json. Do not add any conversational text or explanations.
 
 Input array:
 ${JSON.stringify(texts)}`;
@@ -402,7 +454,16 @@ async function translateClaude(texts, from, to, apiKey, apiHost, apiModel) {
     "zh-TW": "Traditional Chinese",
     "en": "English",
     "ja": "Japanese",
-    "ko": "Korean"
+    "ko": "Korean",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German",
+    "ru": "Russian",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "vi": "Vietnamese",
+    "th": "Thai",
+    "ar": "Arabic"
   };
   const targetLangName = langMap[to] || "Simplified Chinese";
 
@@ -540,6 +601,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return true; // 异步响应
   }
+
+  if (request.action === "openShortcuts") {
+    chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === "updateMenu") {
+    updateContextMenuTitle();
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
 // ==========================================
@@ -551,34 +624,52 @@ const langNames = {
   "zh-TW": "繁体中文",
   "en": "英语",
   "ja": "日语",
-  "ko": "韩语"
+  "ko": "韩语",
+  "fr": "法语",
+  "es": "西班牙语",
+  "de": "德语",
+  "ru": "俄语",
+  "it": "意大利语",
+  "pt": "葡萄牙语",
+  "vi": "越南语",
+  "th": "泰语",
+  "ar": "阿拉伯语"
 };
 
-// 初始化安装时注册右键菜单，标题根据当前目标语言生成
-chrome.runtime.onInstalled.addListener(() => {
+function updateContextMenuTitle() {
   chrome.storage.local.get(['targetLang'], (res) => {
     const targetLang = res.targetLang || 'zh-CN';
     const name = langNames[targetLang] || '简体中文';
-    chrome.contextMenus.create({
-      id: "translate-page",
-      title: `翻译为 ${name}`,
-      contexts: ["page"]
+    
+    chrome.commands.getAll((commands) => {
+      const cmd = commands.find(c => c.name === "toggle-translate");
+      const shortcutText = (cmd && cmd.shortcut) ? ` (${cmd.shortcut})` : "";
+      chrome.contextMenus.update("translate-page", {
+        title: `翻译为 ${name}${shortcutText}`
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.log("Context menu update failed:", chrome.runtime.lastError.message);
+        }
+      });
     });
+  });
+}
+
+// 初始化安装时注册右键菜单，标题根据当前目标语言生成
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "translate-page",
+    title: "翻译为 简体中文",
+    contexts: ["page"]
+  }, () => {
+    updateContextMenuTitle();
   });
 });
 
 // 监听目标语言设置变动，实时更新右键菜单的标题
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.targetLang) {
-    const newTarget = changes.targetLang.newValue || 'zh-CN';
-    const name = langNames[newTarget] || '简体中文';
-    chrome.contextMenus.update("translate-page", {
-      title: `翻译为 ${name}`
-    }, () => {
-      if (chrome.runtime.lastError) {
-        console.log("Context menu title update failed:", chrome.runtime.lastError.message);
-      }
-    });
+    updateContextMenuTitle();
   }
 });
 

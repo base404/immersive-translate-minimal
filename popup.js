@@ -299,4 +299,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // ==========================================
+  // 8. 快捷键配置入口与刷新
+  // ==========================================
+  const shortcutsLink = document.getElementById('open-shortcuts-link');
+  if (shortcutsLink) {
+    shortcutsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.runtime.sendMessage({ action: "openShortcuts" });
+    });
+  }
+
+  // 打开 Popup 时通知后台刷新右键菜单中的快捷键绑定展示
+  chrome.runtime.sendMessage({ action: "updateMenu" });
 });

@@ -47,9 +47,10 @@ function matchSourceLanguage(text) {
   if (clean.length < 2) return false;
 
   const toLang = globalTargetLang;
+  const isTargetChinese = toLang === 'zh-CN' || toLang === 'zh-TW';
 
-  // 情形A：中译外（目标是英文、日文或韩文，需要翻译页面中的中文）
-  if (toLang === 'en' || toLang === 'ja' || toLang === 'ko') {
+  // 情形A：中译外（目标是英文、日文、韩文等外文，需要翻译页面中的中文）
+  if (toLang !== 'zh-CN' && toLang !== 'zh-TW') {
     return /[\u4e00-\u9fa5]/.test(clean);
   }
 
@@ -57,15 +58,32 @@ function matchSourceLanguage(text) {
   if (globalSourceLang === 'en') {
     return hasEnglishText(clean) && !isChineseText(clean);
   } else if (globalSourceLang === 'ja') {
-    // 匹配日文假名
     return /[\u3040-\u309F\u30A0-\u30FF]/.test(clean);
   } else if (globalSourceLang === 'ko') {
-    // 匹配韩文字符
     return /[\uAC00-\uD7AF]/.test(clean);
+  } else if (globalSourceLang === 'fr' || globalSourceLang === 'es' || globalSourceLang === 'de' || globalSourceLang === 'it' || globalSourceLang === 'pt' || globalSourceLang === 'vi') {
+    // 基础和扩展拉丁字符（法语、德语、西班牙语、意大利语、葡萄牙语和越南语）
+    return /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) && !isChineseText(clean);
+  } else if (globalSourceLang === 'ru') {
+    // 西里尔字母（俄语）
+    return /[\u0400-\u04FF]{2,}/.test(clean);
+  } else if (globalSourceLang === 'th') {
+    // 泰文字符
+    return /[\u0E00-\u0E7F]/.test(clean);
+  } else if (globalSourceLang === 'ar') {
+    // 阿拉伯字符
+    return /[\u0600-\u06FF]/.test(clean);
+  } else if (globalSourceLang === 'zh-CN' || globalSourceLang === 'zh-TW') {
+    return /[\u4e00-\u9fa5]/.test(clean);
   } else {
-    // 自动检测 (auto)：当目标是中文时，检测是否为拉丁文字/日文/韩文且并非已经是中文
-    if (toLang === 'zh-CN' || toLang === 'zh-TW') {
-      return (hasEnglishText(clean) || /[\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/.test(clean)) && !isChineseText(clean);
+    // 自动检测 (auto)：当目标是中文时，检测是否包含任一外文字符且并非已经是中文
+    if (isTargetChinese) {
+      return (/[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) || 
+              /[\u3040-\u309F\u30A0-\u30FF]/.test(clean) || 
+              /[\uAC00-\uD7AF]/.test(clean) || 
+              /[\u0400-\u04FF]/.test(clean) || 
+              /[\u0E00-\u0E7F]/.test(clean) || 
+              /[\u0600-\u06FF]/.test(clean)) && !isChineseText(clean);
     }
     return true;
   }
