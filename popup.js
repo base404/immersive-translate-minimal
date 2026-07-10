@@ -317,6 +317,15 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       chrome.runtime.sendMessage({ action: "openShortcuts" });
     });
+    // 动态读取并显示当前的快捷键
+    chrome.commands.getAll((commands) => {
+      const cmd = commands.find(c => c.name === "toggle-translate");
+      if (cmd && cmd.shortcut) {
+        shortcutsLink.textContent = `点击自定义快捷键(${cmd.shortcut})`;
+      } else {
+        shortcutsLink.textContent = `点击自定义快捷键(Alt+Z)`;
+      }
+    });
   }
 
   // ==========================================
