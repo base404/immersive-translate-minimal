@@ -173,89 +173,61 @@ function getCleanText(node) {
 }
 
 // ==========================================
-// 3. 智能串行翻译队列管理与后台交互
+// 3. 翻译队列管理与后台交互
 // ==========================================
 
-let globalQueue = []; // 全局待翻译节点队列
-let isProcessingQueue = false; // 串行队列处理锁
-
 function queueNodeForTranslation(node) {
-  if (node.hasAttribute('data-immersive-translate-queued')) return;
-  node.setAttribute('data-immersive-translate-queued', 'true');
-  globalQueue.push(node);
+  translationQueue.push(node);
   
-  if (queueTimer) clearTimeout(queueTimer);
-  // 使用 300ms 智能冷启动缓冲收集，收集整个页面上所有被批量扫描出的节点
-  queueTimer = setTimeout(processGlobalQueue, 300);
+  if (translationQueue.length >= getBatchSize()) {
+    flushQueue();
+  } else {
+    if (queueTimer) clearTimeout(queueTimer);
+    queueTimer = setTimeout(flushQueue, QUEUE_DELAY);
+  }
 }
 
-function sendTranslationRequest(texts) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({
-      action: "translate",
-      texts: texts,
-      engine: translationEngine,
-      from: globalSourceLang,
-      to: globalTargetLang,
-      config: config
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(response);
-      }
-    });
-  });
-}
-
-async function processGlobalQueue() {
-  if (isProcessingQueue) return;
-  isProcessingQueue = true;
+async function flushQueue() {
+  if (translationQueue.length === 0) return;
   
+  const currentBatch = [...translationQueue];
+  translationQueue = [];
   if (queueTimer) clearTimeout(queueTimer);
   
-  while (globalQueue.length > 0) {
-    const batchSize = getBatchSize(); // 动态批大小：大模型为 80，免费接口为 15
-    const currentBatch = globalQueue.splice(0, batchSize);
-    
-    if (currentBatch.length === 0) break;
-    
-    const textsToTranslate = currentBatch.map(node => getCleanText(node));
-    
-    try {
-      const response = await sendTranslationRequest(textsToTranslate);
-      
-      if (response && response.success && response.translatedTexts) {
-        currentBatch.forEach((node, index) => {
-          node.removeAttribute('data-immersive-translate-queued');
-          node.setAttribute('data-immersive-translate-translated', 'true');
-          
-          const translatedText = response.translatedTexts[index];
-          const originalText = textsToTranslate[index];
-          
-          if (translatedText && translatedText.trim() !== originalText.trim()) {
-            injectTranslation(node, translatedText);
-          }
-        });
-      } else {
-        const errorMsg = response ? response.error : "Unknown background error";
-        console.error("Translation logic execution error:", errorMsg);
-        currentBatch.forEach(node => {
-          node.removeAttribute('data-immersive-translate-queued');
-        });
-      }
-    } catch (err) {
-      console.error("Translation message sending error:", err);
-      currentBatch.forEach(node => {
-        node.removeAttribute('data-immersive-translate-queued');
-      });
+  const textsToTranslate = currentBatch.map(node => getCleanText(node));
+  
+  // 调用 background 进行翻译，透传语言选择
+  chrome.runtime.sendMessage({
+    action: "translate",
+    texts: textsToTranslate,
+    engine: translationEngine,
+    from: globalSourceLang,
+    to: globalTargetLang,
+    config: config
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error("Translation message sending error:", chrome.runtime.lastError);
+      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+      return;
     }
     
-    // 两个请求之间微小的安全排队间隔（100毫秒），保证同一时间后台仅发出 1 个并发
-    await new Promise(r => setTimeout(r, 100));
-  }
-  
-  isProcessingQueue = false;
+    if (response && response.success && response.translatedTexts) {
+      currentBatch.forEach((node, index) => {
+        node.removeAttribute('data-immersive-translate-queued');
+        node.setAttribute('data-immersive-translate-translated', 'true');
+        
+        const translatedText = response.translatedTexts[index];
+        const originalText = textsToTranslate[index];
+        
+        if (translatedText && translatedText.trim() !== originalText.trim()) {
+          injectTranslation(node, translatedText);
+        }
+      });
+    } else {
+      console.error("Translation logic execution error:", response ? response.error : "Unknown background error");
+      currentBatch.forEach(node => node.removeAttribute('data-immersive-translate-queued'));
+    }
+  });
 }
 
 // ==========================================
