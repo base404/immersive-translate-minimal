@@ -332,6 +332,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // 9. 一键清空翻译本地缓存
   // ==========================================
+  function updateCacheSizeDisplay() {
+    const clearCacheLink = document.getElementById('clear-cache-link');
+    if (clearCacheLink) {
+      chrome.storage.local.getBytesInUse('translationCache', (bytes) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Could not get bytes in use:", chrome.runtime.lastError);
+          clearCacheLink.textContent = `清除翻译缓存 (0.0 KB)`;
+          return;
+        }
+        const kb = (bytes / 1024).toFixed(1);
+        clearCacheLink.textContent = `清除翻译缓存 (${kb} KB)`;
+      });
+    }
+  }
+
   const clearCacheLink = document.getElementById('clear-cache-link');
   if (clearCacheLink) {
     clearCacheLink.addEventListener('click', (e) => {
@@ -340,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.runtime.sendMessage({ action: "clearCache" }, (response) => {
         if (response && response.success) {
           showStatus('翻译本地缓存已成功清空！', 'success');
+          updateCacheSizeDisplay();
           setTimeout(() => showStatus(''), 1500);
         } else {
           showStatus('清空缓存失败。', 'error');
@@ -347,6 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  // 初始化调用显示缓存大小
+  updateCacheSizeDisplay();
 
   // 打开 Popup 时通知后台刷新右键菜单中的快捷键绑定展示
   chrome.runtime.sendMessage({ action: "updateMenu" });
