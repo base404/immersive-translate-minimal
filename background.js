@@ -673,6 +673,17 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
+// 监听标签页激活与更新，以便在用户更换或刷新网页时同步最新的快捷键绑定到右键菜单
+chrome.tabs.onActivated.addListener(() => {
+  updateContextMenuTitle();
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'complete') {
+    updateContextMenuTitle();
+  }
+});
+
 // 右键点击触发单页临时翻译
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "translate-page" && tab && tab.id) {
