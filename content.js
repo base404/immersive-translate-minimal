@@ -50,66 +50,92 @@ function isChineseText(text) {
 }
 
 // 核心多语言动态匹配
+function hasScript(text, lang) {
+  if (lang === 'zh-CN' || lang === 'zh-TW' || lang === 'zh') {
+    return /[\u4e00-\u9fa5]/.test(text);
+  }
+  if (lang === 'ja') {
+    return /[\u3040-\u309F\u30A0-\u30FF]/.test(text) || /[\u4e00-\u9fa5]/.test(text);
+  }
+  if (lang === 'ko') {
+    return /[\uAC00-\uD7AF]/.test(text);
+  }
+  if (['en', 'fr', 'es', 'de', 'it', 'pt', 'vi', 'id', 'tr', 'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'hu', 'ro', 'ca', 'gl', 'eu', 'is', 'sq', 'af', 'sw', 'cy'].includes(lang)) {
+    return /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]/.test(text);
+  }
+  if (['ru', 'uk', 'bg', 'sr', 'be', 'mk'].includes(lang)) {
+    return /[\u0400-\u04FF]/.test(text);
+  }
+  if (lang === 'th') {
+    return /[\u0E00-\u0E7F]/.test(text);
+  }
+  if (lang === 'ar' || lang === 'fa') {
+    return /[\u0600-\u06FF]/.test(text);
+  }
+  if (lang === 'el') {
+    return /[\u0370-\u03FF]/.test(text);
+  }
+  if (lang === 'he') {
+    return /[\u0590-\u05FF]/.test(text);
+  }
+  if (lang === 'hi' || lang === 'ne') {
+    return /[\u0900-\u097F]/.test(text);
+  }
+  return false;
+}
+
+function isAlreadyTargetLanguage(text, targetLang) {
+  if (targetLang === 'zh-CN' || targetLang === 'zh-TW' || targetLang === 'zh') {
+    return isChineseText(text);
+  }
+  if (targetLang === 'ko') {
+    return /[\uAC00-\uD7AF]/.test(text);
+  }
+  if (targetLang === 'ja') {
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return true;
+    return false;
+  }
+  if (['en', 'fr', 'es', 'de', 'it', 'pt', 'vi', 'id', 'tr', 'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'hu', 'ro', 'ca', 'gl', 'eu', 'is', 'sq', 'af', 'sw', 'cy'].includes(targetLang)) {
+    const hasLatin = /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]/.test(text);
+    const hasOtherScripts = /[\u4e00-\u9fa5\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF\u0400-\u04FF\u0E00-\u0E7F\u0600-\u06FF\u0370-\u03FF\u0590-\u05FF]/.test(text);
+    return hasLatin && !hasOtherScripts;
+  }
+  if (['ru', 'uk', 'bg', 'sr', 'be', 'mk'].includes(targetLang)) {
+    return /[\u0400-\u04FF]/.test(text);
+  }
+  if (targetLang === 'th') {
+    return /[\u0E00-\u0E7F]/.test(text);
+  }
+  if (targetLang === 'ar' || targetLang === 'fa') {
+    return /[\u0600-\u06FF]/.test(text);
+  }
+  if (targetLang === 'el') {
+    return /[\u0370-\u03FF]/.test(text);
+  }
+  if (targetLang === 'he') {
+    return /[\u0590-\u05FF]/.test(text);
+  }
+  if (targetLang === 'hi' || targetLang === 'ne') {
+    return /[\u0900-\u097F]/.test(text);
+  }
+  return false;
+}
+
 function matchSourceLanguage(text) {
   const clean = text.trim();
   if (clean.length < 2) return false;
 
-  const toLang = globalTargetLang;
-  const isTargetChinese = toLang === 'zh-CN' || toLang === 'zh-TW';
-
-  // 情形A：中译外（目标是英文、日文、韩文等外文，需要翻译页面中的中文）
-  if (toLang !== 'zh-CN' && toLang !== 'zh-TW') {
-    return /[\u4e00-\u9fa5]/.test(clean);
+  // 如果已经达到了目标语言，则跳过不翻译
+  if (isAlreadyTargetLanguage(clean, globalTargetLang)) {
+    return false;
   }
 
-  // 情形B：外译中（目标是简体或繁体中文，需要过滤掉中文本身）
-  if (globalSourceLang === 'en') {
-    return hasEnglishText(clean) && !isChineseText(clean);
-  } else if (globalSourceLang === 'ja') {
-    return /[\u3040-\u309F\u30A0-\u30FF]/.test(clean);
-  } else if (globalSourceLang === 'ko') {
-    return /[\uAC00-\uD7AF]/.test(clean);
-  } else if (globalSourceLang === 'fr' || globalSourceLang === 'es' || globalSourceLang === 'de' || globalSourceLang === 'it' || globalSourceLang === 'pt' || globalSourceLang === 'vi' || globalSourceLang === 'id' || globalSourceLang === 'tr' || globalSourceLang === 'nl' || globalSourceLang === 'pl' || globalSourceLang === 'sv' || globalSourceLang === 'da' || globalSourceLang === 'fi' || globalSourceLang === 'no' || globalSourceLang === 'cs' || globalSourceLang === 'hu' || globalSourceLang === 'ro' || globalSourceLang === 'ca' || globalSourceLang === 'gl' || globalSourceLang === 'eu' || globalSourceLang === 'is' || globalSourceLang === 'sq' || globalSourceLang === 'af' || globalSourceLang === 'sw' || globalSourceLang === 'cy') {
-    // 基础和扩展拉丁字符（法语、德语、西班牙语、意大利语、葡萄牙语、越南语、印尼语、土耳其语、荷兰语、波兰语、瑞典语、丹麦语、芬兰语、挪威语、捷克语、匈牙利语、罗马尼亚语、加泰罗尼亚语、爱尔兰语、加利西亚语、巴斯克语、冰岛语、阿尔巴尼亚语、南非荷兰语、斯瓦希里语、威尔士语）
-    return /[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) && !isChineseText(clean);
-  } else if (globalSourceLang === 'ru' || globalSourceLang === 'uk' || globalSourceLang === 'bg' || globalSourceLang === 'sr' || globalSourceLang === 'be' || globalSourceLang === 'mk') {
-    // 西里尔字母语系（俄语、乌克兰语、保加利亚语、塞尔维亚语、白俄罗斯语、马其顿语）
-    return /[\u0400-\u04FF]{2,}/.test(clean);
-  } else if (globalSourceLang === 'th') {
-    // 泰文字符
-    return /[\u0E00-\u0E7F]/.test(clean);
-  } else if (globalSourceLang === 'ar' || globalSourceLang === 'fa') {
-    // 阿拉伯/波斯字符
-    return /[\u0600-\u06FF]/.test(clean);
-  } else if (globalSourceLang === 'el') {
-    // 希腊字符
-    return /[\u0370-\u03FF]/.test(clean);
-  } else if (globalSourceLang === 'he') {
-    // 希伯来字符
-    return /[\u0590-\u05FF]/.test(clean);
-  } else if (globalSourceLang === 'hi' || globalSourceLang === 'ne') {
-    // 印地语/尼泊尔语（天城文）
-    return /[\u0900-\u097F]/.test(clean);
-  } else if (globalSourceLang === 'zh-CN' || globalSourceLang === 'zh-TW') {
-    return /[\u4e00-\u9fa5]/.test(clean);
-  } else {
-    // 自动检测 (auto)：当目标是中文时，检测是否包含任一主要外文且并非已经是中文
-    if (isTargetChinese) {
-      return (/[a-zA-ZÀ-ÿ\u1E00-\u1EFF]{3,}/.test(clean) || 
-              /[\u3040-\u309F\u30A0-\u30FF]/.test(clean) || 
-              /[\uAC00-\uD7AF]/.test(clean) || 
-              /[\u0400-\u04FF]/.test(clean) || 
-              /[\u0E00-\u0E7F]/.test(clean) || 
-              /[\u0600-\u06FF]/.test(clean) ||
-              /[\u0370-\u03FF]/.test(clean) ||
-              /[\u0590-\u05FF]/.test(clean) ||
-              /[\u0900-\u0DFF]/.test(clean) ||
-              /[\u1000-\u109F]/.test(clean) ||
-              /[\u1780-\u17FF]/.test(clean) ||
-              /[\u0E80-\u0EFF]/.test(clean)) && !isChineseText(clean);
-    }
-    return true;
+  if (globalSourceLang === 'auto') {
+    // 检查是否包含任何支持语言的文字/字母
+    return /[a-zA-ZÀ-ÿ\u1E00-\u1EFF\u4e00-\u9fa5\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF\u0400-\u04FF\u0E00-\u0E7F\u0600-\u06FF\u0370-\u03FF\u0590-\u05FF\u0900-\u097F]/.test(clean);
   }
+
+  return hasScript(clean, globalSourceLang);
 }
 
 // ==========================================
