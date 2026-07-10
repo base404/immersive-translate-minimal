@@ -411,7 +411,6 @@ async function translateGemini(texts, from, to, apiKey, apiHost, apiModel) {
 Input array:
 ${JSON.stringify(texts)}`;
 
-  const model = apiModel || "gemini-1.5-flash";
   const url = `${host}/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
   const res = await fetch(url, {
