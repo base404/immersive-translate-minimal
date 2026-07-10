@@ -342,20 +342,34 @@ async function translateDeepSeek(texts, from, to, apiKey, apiHost, apiModel) {
 Input array:
 ${JSON.stringify(texts)}`;
 
-  const res = await fetch(`${host}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.1
-    })
-  });
+  let retries = 3;
+  let delay = 2000;
+  let res;
+  while (retries > 0) {
+    res = await fetch(`${host}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.1
+      })
+    });
+    
+    if (res.status === 429) {
+      console.warn(`[Antigravity Translate] DeepSeek API 429 Rate Limited. Retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+      retries--;
+      delay *= 2;
+      continue;
+    }
+    break;
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -384,7 +398,7 @@ ${JSON.stringify(texts)}`;
 async function translateGemini(texts, from, to, apiKey, apiHost, apiModel) {
   if (!apiKey) throw new Error("Gemini API Key 未设置");
   const host = (apiHost || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
-  const model = apiModel || "gemini-1.5-flash";
+  const model = apiModel || "gemini-3.1-flash-lite";
   
   console.log(`[Antigravity Translate] Calling Gemini API (${model}) for target language: ${to}`);
 
@@ -413,20 +427,34 @@ ${JSON.stringify(texts)}`;
 
   const url = `${host}/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
-    })
-  });
+  let retries = 3;
+  let delay = 2000;
+  let res;
+  while (retries > 0) {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (res.status === 429) {
+      console.warn(`[Antigravity Translate] Gemini API 429 Rate Limited. Retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+      retries--;
+      delay *= 2;
+      continue;
+    }
+    break;
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -482,21 +510,35 @@ async function translateClaude(texts, from, to, apiKey, apiHost, apiModel) {
 Input array:
 ${JSON.stringify(texts)}`;
 
-  const res = await fetch(`${host}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 4096,
-      messages: [
-        { role: "user", content: prompt }
-      ]
-    })
-  });
+  let retries = 3;
+  let delay = 2000;
+  let res;
+  while (retries > 0) {
+    res = await fetch(`${host}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: [
+          { role: "user", content: prompt }
+        ]
+      })
+    });
+
+    if (res.status === 429) {
+      console.warn(`[Antigravity Translate] Claude API 429 Rate Limited. Retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+      retries--;
+      delay *= 2;
+      continue;
+    }
+    break;
+  }
 
   if (!res.ok) {
     const errorText = await res.text();

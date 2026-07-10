@@ -32,6 +32,7 @@
       padding: 16px; 
       font-size: 13px;
       overflow-x: hidden;
+      /* 去掉了固定 412px 高度与内滚动，使高度自适应包裹内容 */
     }
 
     /* 顶部标题与开关 */
@@ -190,9 +191,12 @@
       pointer-events: none;
     }
 
-    /* 输入框样式 */
+    /* 输入框样式与密码包裹层修复 */
     .input-wrapper {
       position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
     }
 
     input[type="text"], input[type="password"] {
@@ -207,6 +211,11 @@
       transition: all 0.15s ease;
     }
 
+    /* 限制输入框右侧内边距，给“显示”按钮预留出足够空间，防止长点点溢出并推挤 */
+    .input-wrapper input {
+      padding-right: 48px !important;
+    }
+
     input[type="text"]:focus, input[type="password"]:focus {
       border-color: var(--text-main);
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
@@ -218,6 +227,7 @@
       box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.12) !important;
     }
 
+    /* 密码切换绝对居中定位 */
     .password-toggle {
       position: absolute;
       right: 10px;
@@ -228,6 +238,7 @@
       font-size: 11px;
       user-select: none;
       font-weight: 500;
+      z-index: 10;
     }
 
     .password-toggle:hover {
@@ -547,7 +558,7 @@
             <option value="mk">马其顿语</option>
             <option value="be">白俄罗斯语</option>
             <option value="hy">亚美尼亚语</option>
-            <option value="ka">格鲁吉亚语</option>
+            <option value="ka">格鲁章亚语</option>
             <option value="az">亚塞拜疆语</option>
             <option value="uz">乌兹别克语</option>
             <option value="kk">哈萨克语</option>
@@ -645,7 +656,7 @@
       </div>
       <div class="form-group">
         <label for="gemini-model">Model (可选)</label>
-        <input type="text" id="gemini-model" placeholder="默认：gemini-1.5-flash">
+        <input type="text" id="gemini-model" placeholder="默认：gemini-3.1-flash-lite">
       </div>
       <div class="form-group">
         <label for="gemini-host">API Host (可选)</label>
@@ -656,7 +667,7 @@
     <!-- Claude 配置面板 -->
     <div id="claude-config" class="config-card">
       <div class="hint">
-        使用 Claude 翻译。前往 <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> 申请 API Key。
+        使用 Claude 翻译。前往 <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> 申请 API Key.
       </div>
       <div class="form-group">
         <label for="claude-key">API Key</label>
@@ -684,7 +695,7 @@
     <!-- 状态展示条 -->
     <div id="status-bar" class="status-bar"></div>
 
-    <!-- 自定义快捷键提示（调小了底部的 margin-bottom 距离，完美平衡留白） -->
+    <!-- 自定义快捷键提示 -->
     <div style="margin-top: 10px; margin-bottom: 6px; text-align: center;">
       <a href="#" id="open-shortcuts-link">
         快捷键默认 Alt+Z <span>|</span> 点击自定义快捷键

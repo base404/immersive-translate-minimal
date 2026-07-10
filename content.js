@@ -9,8 +9,15 @@ let globalTargetLang = "zh-CN";
 // 存储翻译队列中的节点和信息
 let translationQueue = [];
 let queueTimer = null;
-const QUEUE_BATCH_SIZE = 15;
 const QUEUE_DELAY = 120; // 毫秒
+
+function getBatchSize() {
+  // 大模型 (deepseek, gemini, claude) 批次调大到 50 减少网络往返并增加上下文，免费版维持在 15 左右以防接口限制
+  if (translationEngine === 'google' || translationEngine === 'microsoft') {
+    return 15;
+  }
+  return 50;
+}
 
 // 排除标签
 const EXCLUDE_TAGS = new Set([
@@ -172,7 +179,7 @@ function getCleanText(node) {
 function queueNodeForTranslation(node) {
   translationQueue.push(node);
   
-  if (translationQueue.length >= QUEUE_BATCH_SIZE) {
+  if (translationQueue.length >= getBatchSize()) {
     flushQueue();
   } else {
     if (queueTimer) clearTimeout(queueTimer);

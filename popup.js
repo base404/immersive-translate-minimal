@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Gemini
     geminiKey.value = config.geminiApiKey || '';
     geminiHost.value = config.geminiHost || '';
-    geminiModel.value = config.geminiModel || 'gemini-1.5-flash';
+    geminiModel.value = config.geminiModel || 'gemini-3.1-flash-lite';
     // Claude
     claudeKey.value = config.claudeApiKey || '';
     claudeHost.value = config.claudeHost || '';
