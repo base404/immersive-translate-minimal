@@ -30,6 +30,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveBtn = document.getElementById('save-btn');
   const statusBar = document.getElementById('status-bar');
 
+  // 直译首屏新增元素
+  const settingsToggleBtn = document.getElementById('settings-toggle-btn');
+  const translatePage = document.getElementById('translate-page');
+  const settingsPage = document.getElementById('settings-page');
+  
+  const swapLangsBtn = document.getElementById('swap-langs-btn');
+  const translateInput = document.getElementById('translate-input');
+  const charCount = document.getElementById('char-count');
+  const clearInputBtn = document.getElementById('clear-input-btn');
+  const translateSubmitBtn = document.getElementById('translate-submit-btn');
+  const translateOutput = document.getElementById('translate-output');
+  const copyOutputBtn = document.getElementById('copy-output-btn');
+
   // ==========================================
   // 1. 初始化回显配置
   // ==========================================
@@ -259,7 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       setTimeout(() => {
         showStatus('');
-      }, 1500);
+        // 自动切回直译首屏
+        settingsPage.classList.remove('active');
+        settingsToggleBtn.classList.remove('active');
+        translatePage.classList.add('active');
+        settingsToggleBtn.title = "配置选项";
+      }, 1200);
     });
   });
 
@@ -463,6 +481,152 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // ==========================================
+  // 11. 页面切换逻辑
+  // ==========================================
+  settingsToggleBtn.addEventListener('click', () => {
+    const isSettingsActive = settingsPage.classList.contains('active');
+    if (isSettingsActive) {
+      // 切换到直译页面
+      settingsPage.classList.remove('active');
+      settingsToggleBtn.classList.remove('active');
+      translatePage.classList.add('active');
+      settingsToggleBtn.title = "配置选项";
+    } else {
+      // 切换到设置页面
+      translatePage.classList.remove('active');
+      settingsPage.classList.add('active');
+      settingsToggleBtn.classList.add('active');
+      settingsToggleBtn.title = "返回翻译";
+      showStatus(''); // 切换到设置时清理状态栏
+    }
+  });
+
+  // ==========================================
+  // 12. 直译页面交互逻辑
+  // ==========================================
+
+  // 监听直译页面的源语言/目标语言变动，并自动同步保存
+  sourceLangSelect.addEventListener('change', (e) => {
+    chrome.storage.local.set({ sourceLang: e.target.value }, () => {
+      chrome.storage.local.get(['isEnabled', 'engine', 'config'], (res) => {
+        notifyActiveTab(res.isEnabled, res.engine, e.target.value, targetLangSelect.value, res.config, false);
+      });
+    });
+  });
+
+  targetLangSelect.addEventListener('change', (e) => {
+    chrome.storage.local.set({ targetLang: e.target.value }, () => {
+      chrome.storage.local.get(['isEnabled', 'engine', 'config'], (res) => {
+        notifyActiveTab(res.isEnabled, res.engine, sourceLangSelect.value, e.target.value, res.config, false);
+      });
+    });
+  });
+
+  // 交换源/目标语言
+  swapLangsBtn.addEventListener('click', () => {
+    const sourceVal = sourceLangSelect.value;
+    const targetVal = targetLangSelect.value;
+    
+    if (sourceVal === 'auto') {
+      // 如果源语言是自动检测，交换后源语言设为目标语言，目标语言如果相同设为对应替代
+      sourceLangSelect.value = targetVal;
+      targetLangSelect.value = (targetVal === 'en' ? 'zh-CN' : 'en');
+    } else {
+      sourceLangSelect.value = targetVal;
+      targetLangSelect.value = sourceVal;
+    }
+
+    // 手动触发 change 以便执行保存和通知
+    sourceLangSelect.dispatchEvent(new Event('change'));
+    targetLangSelect.dispatchEvent(new Event('change'));
+  });
+
+  // 输入字符数计数
+  translateInput.addEventListener('input', () => {
+    let val = translateInput.value;
+    if (val.length > 5000) {
+      val = val.substring(0, 5000);
+      translateInput.value = val;
+    }
+    charCount.textContent = `${val.length} / 5000`;
+  });
+
+  // 一键清空输入
+  clearInputBtn.addEventListener('click', () => {
+    translateInput.value = '';
+    charCount.textContent = '0 / 5000';
+    translateInput.focus();
+  });
+
+  // 一键复制译文
+  copyOutputBtn.addEventListener('click', async () => {
+    const text = translateOutput.value.trim();
+    if (!text || text === '翻译结果...' || text.startsWith('正在翻译') || text.startsWith('翻译失败') || text.startsWith('通信错误')) {
+      return;
+    }
+    
+    try {
+      await navigator.clipboard.writeText(text);
+      // 打勾视觉反馈
+      const originalSVG = copyOutputBtn.innerHTML;
+      copyOutputBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      `;
+      copyOutputBtn.style.pointerEvents = 'none';
+      setTimeout(() => {
+        copyOutputBtn.innerHTML = originalSVG;
+        copyOutputBtn.style.pointerEvents = 'auto';
+      }, 1500);
+    } catch (err) {
+      console.error('复制译文失败:', err);
+    }
+  });
+
+  // 触发翻译
+  translateSubmitBtn.addEventListener('click', () => {
+    const text = translateInput.value.trim();
+    if (!text) return;
+
+    translateSubmitBtn.disabled = true;
+    translateSubmitBtn.textContent = '翻译中...';
+    translateOutput.value = '正在翻译中，请稍候...';
+
+    // 实时读取最新的翻译配置
+    chrome.storage.local.get(['engine', 'config'], (res) => {
+      const engine = res.engine || 'google';
+      const config = res.config || {};
+      const from = sourceLangSelect.value;
+      const to = targetLangSelect.value;
+
+      chrome.runtime.sendMessage({
+        action: "translate",
+        texts: [text],
+        engine: engine,
+        from: from,
+        to: to,
+        config: config
+      }, (response) => {
+        translateSubmitBtn.disabled = false;
+        translateSubmitBtn.textContent = '翻译';
+
+        if (chrome.runtime.lastError) {
+          translateOutput.value = `通信错误: ${chrome.runtime.lastError.message}`;
+          return;
+        }
+
+        if (response && response.success) {
+          translateOutput.value = response.translatedTexts[0] || '';
+        } else {
+          const errReason = response ? response.error : '未知后台错误';
+          translateOutput.value = `翻译失败: ${errReason}`;
+        }
+      });
+    });
+  });
 
   // 打开 Popup 时通知后台刷新右键菜单中的快捷键绑定展示
   chrome.runtime.sendMessage({ action: "updateMenu" });
